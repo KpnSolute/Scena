@@ -31,6 +31,8 @@ export const ROUTE_METADATA: RouteMeta[] = [
   { path: "/app/sessions", label: "Sessions", status: "functional" },
   { path: "/app/sessions/new", label: "New session", status: "functional" },
   { path: "/app/sessions/:sessionId", label: "Session detail & composer", status: "functional", note: "Rename/start/stop/delete-draft, display mode, and screen assignment via src/domain/sessions.ts." },
+  { path: "/app/layouts", label: "Layouts", status: "functional", note: "Create/rename/duplicate/activate-deactivate/delete via src/domain/layouts.ts. Delete is DB RESTRICT-guarded — a friendly message points to Deactivate instead of leaking the Postgres error." },
+  { path: "/app/layouts/:layoutId", label: "Layout tile editor", status: "functional", note: "Percentage-based tile canvas: add/move/resize/reorder/remove tiles via src/domain/layouts.ts. Adding a tile needs an existing Scene (src/domain/scenes.ts, read-only listing) — there is no Scene-creation UI yet, so an empty Scene list shows a truthful EmptyState instead of a non-functional control." },
   { path: "/app/automations", label: "Automations", status: "functional", note: "List plus inline create/rename/enable/disable modals via src/domain/automations.ts — no separate editor routes." },
   { path: "/app/members", label: "Members", status: "functional", note: "Role change and remove are real (upsertMember/removeMember). No invite-by-email UI — team_invitations exists in the schema but no client function calls it yet." },
   { path: "/app/billing", label: "Billing", status: "functional", note: "Manage-billing opens the real Stripe portal; checkout creates a NEW paid Workspace (no in-place plan upgrade API exists)." },

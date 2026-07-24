@@ -72,37 +72,96 @@
   color: #fff; overflow: hidden; user-select: none; font-size: 14px; padding: 4px;
 }
 
-/* Live element previews. These stay compact so the same renderer remains
-   legible on a small editor canvas and in the full-size player. */
-.scena-editor__renderer-text, .scena-editor__renderer-data-text { overflow-wrap: anywhere; }
-.scena-editor__renderer-image, .scena-editor__renderer-video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.scena-editor__renderer-clock { font: 700 clamp(16px, 7vw, 48px)/1 var(--scena-font-mono); letter-spacing: -.04em; white-space: nowrap; }
-.scena-editor__renderer-date { font-weight: 650; white-space: nowrap; }
-.scena-editor__renderer-countdown { display: flex; align-items: center; gap: clamp(4px, 1.2vw, 12px); }
-.scena-editor__renderer-countdown-unit { display: grid; gap: 2px; text-align: center; min-width: 2.1em; }
-.scena-editor__renderer-countdown-unit strong { font: 700 clamp(16px, 5vw, 38px)/1 var(--scena-font-mono); }
-.scena-editor__renderer-countdown-unit small { color: rgba(255,255,255,.62); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
-.scena-editor__renderer-qr { width: min(100%, 160px); height: min(100%, 160px); background: #fff; padding: 5px; box-sizing: border-box; }
-.scena-editor__renderer-qr svg { width: 100%; height: 100%; display: block; }
-.scena-editor__renderer-player { width: 100%; display: flex; align-items: center; gap: 8px; min-width: 0; text-align: left; }
-.scena-editor__renderer-player-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 8px; background: var(--scena-violet); font-size: 18px; }
-.scena-editor__renderer-player-copy { display: grid; min-width: 0; gap: 2px; }
-.scena-editor__renderer-player-copy strong, .scena-editor__renderer-player-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scena-editor__renderer-player-copy small, .scena-editor__renderer-player-status { color: rgba(255,255,255,.62); font-size: 10px; }
-.scena-editor__renderer-player audio { width: 95px; height: 26px; margin-left: auto; }
-.scena-editor__renderer-ticker { display: flex; gap: 28px; width: max-content; min-width: 100%; white-space: nowrap; font-weight: 650; }
-.scena-editor__renderer-ticker span + span { color: var(--scena-cyan); }
-.scena-editor__renderer-carousel { position: relative; width: 100%; height: 100%; }
-.scena-editor__renderer-carousel img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.scena-editor__renderer-carousel-dots { position: absolute; left: 0; right: 0; bottom: 5px; display: flex; justify-content: center; gap: 4px; }
+/* Live element renderers (src/components/editor/elements/). Font sizes and
+   media/QR dimensions come from configured, zoom-scaled values applied
+   inline by the renderer components — this stylesheet only lays boxes out,
+   it never hardcodes a clamp()/vw size that would fight the configured
+   size or fail to track zoom. */
+.scena-editor__renderer-frame { min-width: 0; min-height: 0; }
+.scena-editor__renderer-frame--column { flex-direction: column; gap: 4px; }
+.scena-editor__renderer-text, .scena-editor__renderer-data-text { display: inline-block; }
+.scena-editor__renderer-image, .scena-editor__renderer-video,
+.scena-editor__renderer-carousel-slide { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.scena-editor__renderer-media-placeholder {
+  width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.24); border-radius: inherit;
+  color: rgba(255,255,255,.6); font-size: 11px; text-align: center; padding: 6px; box-sizing: border-box;
+}
+.scena-editor__renderer-media-placeholder--error { color: var(--scena-danger); border-color: color-mix(in srgb, var(--scena-danger) 45%, transparent); }
+
+.scena-editor__renderer-clock, .scena-editor__renderer-date { letter-spacing: -.02em; white-space: nowrap; }
+
+.scena-editor__renderer-countdown { display: flex; align-items: center; gap: 0.5em; }
+.scena-editor__renderer-countdown-unit { display: grid; gap: 2px; text-align: center; min-width: 1.6em; }
+.scena-editor__renderer-countdown-unit strong { font-size: 1em; font-weight: 700; line-height: 1; }
+.scena-editor__renderer-countdown-unit small { color: rgba(255,255,255,.62); font-size: 0.32em; text-transform: uppercase; letter-spacing: .08em; }
+.scena-editor__renderer-countdown-expired { font-weight: 700; }
+
+.scena-editor__renderer-qr { width: 100%; height: 100%; background: transparent; display: flex; align-items: center; justify-content: center; }
+.scena-editor__renderer-qr svg { width: 100%; height: 100%; display: block; shape-rendering: crispEdges; }
+.scena-editor__renderer-qr-empty {
+  width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.24); border-radius: var(--scena-radius-sm);
+  color: rgba(255,255,255,.6); font-size: 10px; text-align: center; padding: 6px; box-sizing: border-box;
+}
+
+/* Ticker (a horizontally scrolling text band). Content is duplicated by the
+   component so the -50% keyframe loop is seamless. Pure CSS animation —
+   respects prefers-reduced-motion unconditionally, regardless of the
+   `paused` config. */
+.scena-editor__renderer-ticker-track { width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; }
+.scena-editor__renderer-ticker { display: flex; gap: 48px; width: max-content; white-space: nowrap; will-change: transform; }
+.scena-editor__renderer-ticker--left { animation-name: scena-ticker-scroll-left; animation-timing-function: linear; animation-iteration-count: infinite; }
+.scena-editor__renderer-ticker--right { animation-name: scena-ticker-scroll-right; animation-timing-function: linear; animation-iteration-count: infinite; }
+.scena-editor__renderer-ticker--paused { animation-play-state: paused; }
+@keyframes scena-ticker-scroll-left { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }
+@keyframes scena-ticker-scroll-right { from { transform: translate3d(-50%,0,0); } to { transform: translate3d(0,0,0); } }
+@media (prefers-reduced-motion: reduce) {
+  .scena-editor__renderer-ticker--left, .scena-editor__renderer-ticker--right { animation: none; transform: none; }
+}
+
+.scena-editor__renderer-player-preview { width: 100%; display: flex; align-items: center; gap: 10px; min-width: 0; text-align: left; }
+.scena-editor__renderer-player-artwork { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 8px; color: #fff; }
+.scena-editor__renderer-player-preview-body { display: grid; min-width: 0; gap: 4px; }
+.scena-editor__renderer-player-preview-title { color: rgba(255,255,255,.85); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scena-editor__renderer-player-progress { display: block; width: 90px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); overflow: hidden; }
+.scena-editor__renderer-player-progress i { display: block; width: 35%; height: 100%; }
+
+.scena-editor__renderer-video-placeholder {
+  width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: rgba(255,255,255,.04); color: rgba(255,255,255,.7); font-size: 11px; box-sizing: border-box;
+}
+.scena-editor__renderer-video-placeholder small { color: rgba(255,255,255,.55); }
+
+.scena-editor__renderer-carousel { width: 100%; height: 100%; }
+.scena-editor__renderer-carousel-dots { position: absolute; left: 0; right: 0; bottom: 5px; display: flex; justify-content: center; gap: 4px; z-index: 1; }
 .scena-editor__renderer-carousel-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.5); }
 .scena-editor__renderer-carousel-dots i.is-active { background: #fff; }
+.scena-editor__renderer-carousel-slide--fade { animation: scena-carousel-fade-in .5s var(--scena-ease-standard); }
+.scena-editor__renderer-carousel-slide--slide { animation: scena-carousel-slide-in .5s var(--scena-ease-standard); }
+@keyframes scena-carousel-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scena-carousel-slide-in { from { opacity: 0; transform: translateX(4%); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .scena-editor__renderer-carousel-slide--fade, .scena-editor__renderer-carousel-slide--slide { animation: none; }
+}
+
 .scena-editor__renderer-weather { display: flex; align-items: center; gap: 10px; text-align: left; }
-.scena-editor__renderer-weather-icon { font-size: clamp(24px, 8vw, 54px); line-height: 1; }
+.scena-editor__renderer-weather-icon { flex: 0 0 auto; font-size: 28px; line-height: 1; color: var(--scena-cyan); }
 .scena-editor__renderer-weather span:last-child { display: grid; gap: 2px; min-width: 0; }
-.scena-editor__renderer-weather strong { font: 700 clamp(20px, 6vw, 42px)/1 var(--scena-font-mono); }
-.scena-editor__renderer-weather small, .scena-editor__renderer-weather em { color: rgba(255,255,255,.7); font-size: 10px; font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scena-editor__renderer-weather strong { font-family: var(--scena-font-mono); font-weight: 700; line-height: 1; }
+.scena-editor__renderer-weather small, .scena-editor__renderer-weather em { font-size: 0.62em; font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .75; }
+
+.scena-editor__renderer-preview-badge {
+  display: inline-flex; align-items: center; padding: 2px 7px; border-radius: var(--scena-radius-pill);
+  background: rgba(255,255,255,.1); color: rgba(255,255,255,.65); font-size: 9px; font-weight: 600;
+  letter-spacing: .01em; white-space: nowrap;
+}
+
 .scena-editor__renderer-fallback { padding: 8px 12px; border: 1px dashed rgba(255,255,255,.28); border-radius: var(--scena-radius-sm); color: rgba(255,255,255,.65); font-size: 11px; }
+.scena-editor__scene-settings { display: flex; align-items: center; gap: 8px; margin-left: 8px; padding-left: 10px; border-left: 1px solid var(--scena-border); color: var(--scena-text-muted); font-size: var(--scena-text-xs); }
+.scena-editor__scene-settings label { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.scena-editor__scene-settings input, .scena-editor__scene-settings select { width: auto; min-width: 72px; height: 28px; padding: 0 6px; font-size: var(--scena-text-xs); }
 
 /* Shape geometry (variant A-H) renders as SVG so fill + border stay in
    lockstep for every variant, including the clip-path-shaped ones (a CSS

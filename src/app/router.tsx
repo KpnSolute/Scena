@@ -23,6 +23,8 @@ import { PairScreenPage } from "../pages/screens/PairScreenPage";
 import { SessionsPage } from "../pages/sessions/SessionsPage";
 import { NewSessionPage } from "../pages/sessions/NewSessionPage";
 import { SessionDetailPage } from "../pages/sessions/SessionDetailPage";
+import { LayoutsPage } from "../pages/layouts/LayoutsPage";
+import { LayoutDetailPage } from "../pages/layouts/LayoutDetailPage";
 import { AutomationsPage } from "../pages/automations/AutomationsPage";
 import { MembersPage } from "../pages/members/MembersPage";
 import { BillingPage } from "../pages/billing/BillingPage";
@@ -85,6 +87,8 @@ export const routeTree: RouteObject[] = [
           { path: "sessions", element: <SessionsPage /> },
           { path: "sessions/new", element: <NewSessionPage /> },
           { path: "sessions/:sessionId", element: <SessionDetailPage /> },
+          { path: "layouts", element: <LayoutsPage /> },
+          { path: "layouts/:layoutId", element: <LayoutDetailPage /> },
           { path: "automations", element: <AutomationsPage /> },
           { path: "members", element: <MembersPage /> },
           { path: "billing", element: <BillingPage /> },

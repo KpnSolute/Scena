@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode } from "react";
 import { cx } from "./cx";
 
 export interface MenuItemDef {
@@ -22,7 +22,7 @@ export interface DropdownMenuProps {
 export function DropdownMenu({ trigger, items, align = "right" }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLSpanElement>(null);
+  const triggerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -43,23 +43,27 @@ export function DropdownMenu({ trigger, items, align = "right" }: DropdownMenuPr
     };
   }, [open]);
 
+  // The trigger is cloned in place (instead of wrapped in a focusable span) so
+  // that focus, click, and ARIA state attach directly to whatever focusable
+  // element the caller passed — wrapping would either double up focus stops
+  // or, for non-focusable triggers, remove the trigger from the tab order.
+  const triggerNode = isValidElement(trigger)
+    ? cloneElement(trigger as ReactElement<Record<string, unknown>>, {
+        ref: triggerRef,
+        onClick: (event: ReactMouseEvent) => {
+          (trigger.props as { onClick?: (e: ReactMouseEvent) => void }).onClick?.(event);
+          setOpen((value) => !value);
+        },
+        "aria-haspopup": "menu",
+        "aria-expanded": open,
+      })
+    : trigger;
+
   return (
     <div className="scena-menu-wrap" ref={wrapRef}>
-      <span
-        ref={triggerRef}
-        tabIndex={-1}
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        style={{ display: "inline-flex" }}
-      >
-        {trigger}
-      </span>
+      {triggerNode}
       {open && (
-        <div
-          className={cx("scena-menu-popover", align === "left" && "scena-menu-popover--left")}
-          style={align === "left" ? { right: "auto", left: 0 } : undefined}
-        >
+        <div className={cx("scena-menu-popover", align === "left" && "scena-menu-popover--left")}>
           <div className="scena-menu scena-glass-medium" role="menu">
             {items.map((item) => (
               <button

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Eye, EyeSlash, LockSimple, LockSimpleOpen, ArrowUp, ArrowDown, Trash } from "@phosphor-icons/react";
 import type { SceneElement, BorderStyle } from "../../services/scena-api/boards";
-import { readBorderConfig, readShapeConfig } from "../../services/scena-api/boards";
+import { readBorderConfig, readShapeConfig, readTextStyle } from "../../services/scena-api/boards";
 import { Field } from "../ui/Field";
 import { Input, Textarea } from "../ui/Input";
 import { Select } from "../ui/Select";
@@ -29,17 +29,17 @@ type ConfigurableElementType =
   | "data_text";
 
 const CONFIG_DEFAULTS: Record<ConfigurableElementType, Record<string, unknown>> = {
-  clock: { format: "HH:mm", timezone: "local" },
-  date: { format: "MMM d, yyyy", timezone: "local" },
-  countdown: { target: "", format: "days_hours_minutes" },
+  clock: { time_format: "12h", show_seconds: false, timezone: "" },
+  date: { date_format: "long", timezone: "" },
+  countdown: { target: "", units: "dhms", expired_text: "Time's up", show_labels: true },
   qr_static: { value: "" },
-  qr_dynamic: { target: "" },
-  music_player: { url: "", title: "", autoplay: false },
-  ticker: { items: [], speed: 40, direction: "left" },
-  carousel: { items: [], interval: 5, autoplay: true },
-  video: { url: "", autoplay: false, muted: true, loop: true },
-  weather: { location: "", latitude: "", longitude: "", units: "fahrenheit", format: "current" },
-  data_text: { key: "", fallback: "", format: "text" },
+  qr_dynamic: { value: "" },
+  music_player: { show_artwork: true, show_progress: true, accent: "#5b7cfa" },
+  ticker: { text: "Scrolling announcement", duration_s: 20, direction: "left", paused: false },
+  carousel: { asset_ids: [], interval_ms: 5000, transition: "fade" },
+  video: { autoplay: true, muted: true, loop: true },
+  weather: { location: "", units: "imperial", show_condition: true },
+  data_text: { source_key: "", prefix: "", suffix: "", fallback: "—" },
 };
 
 /** Returns stable, UI-friendly defaults without changing the saved config. */
@@ -126,6 +126,29 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
         </div>
       )}
 
+      {isTypographyElement(element.element_type) && (
+        <div className="scena-editor__prop-group">
+          <h4>Typography</h4>
+          <div className="scena-editor__prop-row">
+            <Field label="Font family"><Select value={readTextStyle(element).font_family} options={[{ value: "body", label: "Instrument Sans" }, { value: "display", label: "Bricolage Grotesque" }, { value: "mono", label: "JetBrains Mono" }]} onChange={(event) => updateConfig({ font_family: event.target.value })} /></Field>
+            <Field label="Weight"><Input type="number" min={400} max={800} step={100} value={readTextStyle(element).font_weight} onChange={(event) => updateConfig({ font_weight: Number(event.target.value) })} /></Field>
+          </div>
+          <div className="scena-editor__prop-row">
+            <Field label="Size"><Input type="number" min={4} max={800} value={readTextStyle(element).font_size} onChange={(event) => updateConfig({ font_size: Number(event.target.value) })} /></Field>
+            <Field label="Line height"><Input type="number" min={0.5} max={4} step={0.1} value={readTextStyle(element).line_height} onChange={(event) => updateConfig({ line_height: Number(event.target.value) })} /></Field>
+          </div>
+          <div className="scena-editor__prop-row">
+            <Field label="Align"><Select value={readTextStyle(element).align} options={[{ value: "left", label: "Left" }, { value: "center", label: "Center" }, { value: "right", label: "Right" }]} onChange={(event) => updateConfig({ align: event.target.value })} /></Field>
+            <Field label="Vertical"><Select value={readTextStyle(element).vertical_align} options={[{ value: "top", label: "Top" }, { value: "middle", label: "Middle" }, { value: "bottom", label: "Bottom" }]} onChange={(event) => updateConfig({ vertical_align: event.target.value })} /></Field>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Field label="Color"><input type="color" value={readTextStyle(element).color} onChange={(event) => updateConfig({ color: event.target.value })} style={{ width: 40, height: 32, border: "none", borderRadius: "var(--scena-radius-sm)", cursor: "pointer" }} /></Field>
+            <CheckboxField label="Italic" checked={readTextStyle(element).italic} onChange={(checked) => updateConfig({ italic: checked })} />
+            <CheckboxField label="Underline" checked={readTextStyle(element).underline} onChange={(checked) => updateConfig({ underline: checked })} />
+          </div>
+        </div>
+      )}
+
       {element.element_type === "shape" && (
         <div className="scena-editor__prop-group">
           <h4>Shape</h4>
@@ -154,15 +177,16 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
       {element.element_type === "clock" && (
         <div className="scena-editor__prop-group">
           <h4>Clock</h4>
-          <Field label="Time format"><Select value={String(config.format)} options={[{ value: "HH:mm", label: "24-hour (14:30)" }, { value: "hh:mm A", label: "12-hour (2:30 PM)" }, { value: "HH:mm:ss", label: "24-hour with seconds" }]} onChange={(event) => updateConfig({ format: event.target.value })} /></Field>
-          <Field label="Timezone" hint="Use local for the display device timezone."><Input value={String(config.timezone)} onChange={(event) => updateConfig({ timezone: event.target.value })} /></Field>
+          <Field label="Time format"><Select value={String(config.time_format)} options={[{ value: "24h", label: "24-hour (14:30)" }, { value: "12h", label: "12-hour (2:30 PM)" }]} onChange={(event) => updateConfig({ time_format: event.target.value })} /></Field>
+          <CheckboxField label="Show seconds" checked={Boolean(config.show_seconds)} onChange={(checked) => updateConfig({ show_seconds: checked })} />
+          <Field label="Timezone" hint="Leave blank to use the assigned Display location timezone."><Input value={String(config.timezone)} onChange={(event) => updateConfig({ timezone: event.target.value })} /></Field>
         </div>
       )}
 
       {element.element_type === "date" && (
         <div className="scena-editor__prop-group">
           <h4>Date</h4>
-          <Field label="Date format"><Select value={String(config.format)} options={[{ value: "MMM d, yyyy", label: "Jul 23, 2026" }, { value: "MMMM d, yyyy", label: "July 23, 2026" }, { value: "dd/MM/yyyy", label: "23/07/2026" }, { value: "MM/dd/yyyy", label: "07/23/2026" }]} onChange={(event) => updateConfig({ format: event.target.value })} /></Field>
+          <Field label="Date format"><Select value={String(config.date_format)} options={[{ value: "long", label: "July 23, 2026" }, { value: "medium", label: "Jul 23, 2026" }, { value: "short", label: "07/23/2026" }, { value: "weekday", label: "Thursday" }, { value: "iso", label: "2026-07-23" }]} onChange={(event) => updateConfig({ date_format: event.target.value })} /></Field>
           <Field label="Timezone"><Input value={String(config.timezone)} onChange={(event) => updateConfig({ timezone: event.target.value })} /></Field>
         </div>
       )}
@@ -177,7 +201,9 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
               onChange={(event) => updateConfig({ target: event.target.value })}
             />
           </Field>
-          <Field label="Display format"><Select value={String(config.format)} options={[{ value: "days_hours_minutes", label: "Days, hours, minutes" }, { value: "hours_minutes_seconds", label: "Hours, minutes, seconds" }]} onChange={(event) => updateConfig({ format: event.target.value })} /></Field>
+          <Field label="Units"><Select value={String(config.units)} options={[{ value: "dhms", label: "Days, hours, minutes, seconds" }, { value: "hms", label: "Hours, minutes, seconds" }, { value: "ms", label: "Minutes, seconds" }]} onChange={(event) => updateConfig({ units: event.target.value })} /></Field>
+          <Field label="Expired text"><Input value={String(config.expired_text)} onChange={(event) => updateConfig({ expired_text: event.target.value })} /></Field>
+          <CheckboxField label="Show unit labels" checked={Boolean(config.show_labels)} onChange={(checked) => updateConfig({ show_labels: checked })} />
         </div>
       )}
 
@@ -186,7 +212,7 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
       )}
 
       {element.element_type === "qr_dynamic" && (
-        <ConfigGroup title="Dynamic QR code"><Field label="Target URL" hint="The destination encoded when the display renders the code."><Input type="url" value={String(config.target)} onChange={(event) => updateConfig({ target: event.target.value })} /></Field></ConfigGroup>
+        <ConfigGroup title="Dynamic QR code"><Field label="Target URL" hint="The destination encoded when the Display renders the code."><Input type="url" value={String(config.value)} onChange={(event) => updateConfig({ value: event.target.value })} /></Field></ConfigGroup>
       )}
 
       {element.element_type === "music_player" && (
@@ -199,8 +225,9 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
 
       {element.element_type === "ticker" && (
         <ConfigGroup title="Ticker">
-          <Field label="Items" hint="One message per line."><Textarea rows={4} value={itemsToText(config.items)} onChange={(event) => updateConfig({ items: textToItems(event.target.value) })} /></Field>
-          <div className="scena-editor__prop-row"><Field label="Speed"><Input type="number" min={1} value={String(config.speed)} onChange={(event) => updateConfig({ speed: Number(event.target.value) })} /></Field><Field label="Direction"><Select value={String(config.direction)} options={[{ value: "left", label: "Left" }, { value: "right", label: "Right" }]} onChange={(event) => updateConfig({ direction: event.target.value })} /></Field></div>
+          <Field label="Message"><Textarea rows={4} value={String(config.text)} onChange={(event) => updateConfig({ text: event.target.value })} /></Field>
+          <div className="scena-editor__prop-row"><Field label="Seconds per loop"><Input type="number" min={2} max={300} value={String(config.duration_s)} onChange={(event) => updateConfig({ duration_s: Number(event.target.value) })} /></Field><Field label="Direction"><Select value={String(config.direction)} options={[{ value: "left", label: "Left" }, { value: "right", label: "Right" }]} onChange={(event) => updateConfig({ direction: event.target.value })} /></Field></div>
+          <CheckboxField label="Pause ticker" checked={Boolean(config.paused)} onChange={(checked) => updateConfig({ paused: checked })} />
         </ConfigGroup>
       )}
 
@@ -223,19 +250,17 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
 
       {element.element_type === "weather" && (
         <ConfigGroup title="Weather">
-          <Field label="Location" hint="City, region, or postal code."><Input value={String(config.location)} onChange={(event) => updateConfig({ location: event.target.value })} /></Field>
-          <Field label="Latitude" hint="Required for live weather. Example: 40.7128"><Input inputMode="decimal" value={String(config.latitude)} onChange={(event) => updateConfig({ latitude: event.target.value })} /></Field>
-          <Field label="Longitude" hint="Required for live weather. Example: -74.0060"><Input inputMode="decimal" value={String(config.longitude)} onChange={(event) => updateConfig({ longitude: event.target.value })} /></Field>
-          <Field label="Units"><Select value={String(config.units)} options={[{ value: "fahrenheit", label: "Fahrenheit" }, { value: "celsius", label: "Celsius" }]} onChange={(event) => updateConfig({ units: event.target.value })} /></Field>
-          <Field label="Display format"><Select value={String(config.format)} options={[{ value: "current", label: "Current conditions" }, { value: "current_forecast", label: "Current + forecast" }]} onChange={(event) => updateConfig({ format: event.target.value })} /></Field>
+          <Field label="Location" hint="Saved for a future provider; this product does not currently fetch weather."><Input value={String(config.location)} onChange={(event) => updateConfig({ location: event.target.value })} /></Field>
+          <Field label="Units"><Select value={String(config.units)} options={[{ value: "imperial", label: "Fahrenheit" }, { value: "metric", label: "Celsius" }]} onChange={(event) => updateConfig({ units: event.target.value })} /></Field>
+          <CheckboxField label="Show condition line" checked={Boolean(config.show_condition)} onChange={(checked) => updateConfig({ show_condition: checked })} />
         </ConfigGroup>
       )}
 
       {element.element_type === "data_text" && (
         <ConfigGroup title="Live data text">
-          <Field label="Data key" hint="A key supplied by the display data context, not a network endpoint."><Input value={String(config.key)} onChange={(event) => updateConfig({ key: event.target.value })} /></Field>
+          <Field label="Data key" hint="A key supplied by a future display data context, not a network endpoint."><Input value={String(config.source_key)} onChange={(event) => updateConfig({ source_key: event.target.value })} /></Field>
           <Field label="Fallback text"><Input value={String(config.fallback)} onChange={(event) => updateConfig({ fallback: event.target.value })} /></Field>
-          <Field label="Format"><Input value={String(config.format)} onChange={(event) => updateConfig({ format: event.target.value })} /></Field>
+          <div className="scena-editor__prop-row"><Field label="Prefix"><Input value={String(config.prefix)} onChange={(event) => updateConfig({ prefix: event.target.value })} /></Field><Field label="Suffix"><Input value={String(config.suffix)} onChange={(event) => updateConfig({ suffix: event.target.value })} /></Field></div>
         </ConfigGroup>
       )}
     </div>
@@ -256,6 +281,10 @@ function itemsToText(value: unknown): string {
 
 function textToItems(value: string): string[] {
   return value.split("\n").map((item) => item.trim()).filter(Boolean);
+}
+
+function isTypographyElement(type: SceneElement["element_type"]): boolean {
+  return ["text", "clock", "date", "countdown", "ticker", "weather", "data_text"].includes(type);
 }
 
 function round(value: number): number {

@@ -501,6 +501,8 @@ Personnel must not:
 - Claim home-worker storage is the durable source of truth.
 - Manually bypass Workspace, quota, or billing checks.
 
+Board editing capability claims must follow the capability matrix in `docs/sop/Purpose.md` §6.5. In particular, typography, scene timing/transitions, QR links, ticker/countdown behavior, and ready Asset previews are supported persisted Board features. Weather, video, music player, and live data text are configuration previews only until their respective live data or ingest providers are implemented; they must not be sold or rendered as live customer data.
+
 ---
 
 ## 17. Acceptance criteria

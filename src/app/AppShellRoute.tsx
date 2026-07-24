@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   House, SquaresFour, Images, Monitor, Broadcast, Lightning, UsersThree, Gear,
-  CreditCard, MapPin,
+  CreditCard, MapPin, Layout,
 } from "@phosphor-icons/react";
 import { ScenaMark } from "../components/brand/ScenaMark";
 import { useManagerContext } from "./ManagerContextProvider";
@@ -27,6 +27,7 @@ const RAIL_ITEMS: RailItem[] = [
   { to: "/app/boards", label: "Boards", icon: <SquaresFour size={22} /> },
   { to: "/app/assets", label: "Assets", icon: <Images size={22} /> },
   { to: "/app/screens", label: "Displays", icon: <Monitor size={22} /> },
+  { to: "/app/layouts", label: "Layouts", icon: <Layout size={22} /> },
   { to: "/app/sessions", label: "Sessions", icon: <Broadcast size={22} /> },
   { to: "/app/automations", label: "Automations", icon: <Lightning size={22} /> },
   { to: "/app/locations", label: "Locations", icon: <MapPin size={22} /> },

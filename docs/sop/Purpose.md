@@ -279,6 +279,23 @@ Every Session is limited to four active Displays regardless of Workspace plan.
 
 Session Groups do not provide additional concurrent-Session capacity.
 
+### 6.5 Board editing capability matrix
+
+Board editing is a persisted Workspace capability. Board scenes, element geometry, element configuration, scene duration, scene transitions, revisions, and optimistic version checks are stored through the canonical Board API and must never be represented as editor-only state.
+
+| Board editing capability | Personal Free | Plus | Pro | Max |
+|---|---:|---:|---:|---:|
+| Text, image, shape, Asset page, QR, clock, date, countdown, ticker | Yes | Yes | Yes | Yes |
+| Typography: Scena font families, weight, size, alignment, color, decoration | Yes | Yes | Yes | Yes |
+| Scene duration and transitions | Yes | Yes | Yes | Yes |
+| Asset-backed image/PDF/PowerPoint previews | Yes | Yes | Yes | Yes |
+| Carousel/gallery using ready Assets | Yes | Yes | Yes | Yes |
+| Revisions and version-conflict recovery | Yes | Yes | Yes | Yes |
+| Weather, video, music player, live data text | Preview only | Preview only | Preview only | Preview only |
+| Board publication workflow | Not available | Not available | Not available | Not available |
+
+Weather, video, music player, and live data text controls may save configuration and render designed previews, but they must state that no live data source is connected. Scena must not display invented weather, media playback, or data values on a customer Display. Time, date, countdown, ticker, QR, scene transitions, and ready Asset previews are supported Board behavior and are pushed to active Sessions when the Board is saved.
+
 ---
 
 ## 7. Personal Free Quota Rules

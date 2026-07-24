@@ -28,11 +28,11 @@ export function WorkspaceSwitcher({ context }: { context: ManagerContext }) {
       <DropdownMenu
         align="left"
         trigger={
-          <span className="scena-workspace-trigger">
+          <button type="button" className="scena-workspace-trigger" aria-label="Switch workspace">
             {context.workspace.type === "team" ? <Buildings size={18} /> : <User size={18} />}
             <span className="scena-workspace-trigger__name">{context.workspace.name}</span>
             <CaretUpDown size={14} />
-          </span>
+          </button>
         }
       items={context.workspaces.map((workspace) => {
         const isCurrent = workspace.id === context.workspace.id;

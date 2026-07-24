@@ -162,8 +162,15 @@
 .scena-error-banner__details summary { cursor: pointer; font-size: var(--scena-text-xs); color: var(--scena-text-muted); }
 .scena-error-banner__details pre { font-family: var(--scena-font-mono); font-size: var(--scena-text-xs); color: var(--scena-text-muted); white-space: pre-wrap; margin-top: var(--scena-space-2); }
 
+/* ── Account menu trigger (button-chrome reset around Avatar) ── */
+.scena-account-trigger {
+  background: none; border: 0; padding: 0; font: inherit; color: inherit;
+  cursor: pointer; display: inline-flex; border-radius: 50%;
+}
+
 /* ── Workspace switcher trigger ──────────────────────── */
 .scena-workspace-trigger {
+  background: none; font: inherit;
   display: inline-flex; align-items: center; gap: var(--scena-space-2); height: 40px;
   padding: 0 var(--scena-space-3); border-radius: var(--scena-radius-md); cursor: pointer;
   color: var(--scena-text-primary); font-size: var(--scena-text-sm); font-weight: 600;
@@ -189,6 +196,7 @@
 .scena-menu__separator { height: 1px; background: var(--scena-border); margin: var(--scena-space-2) var(--scena-space-1); }
 .scena-menu-wrap { position: relative; display: inline-block; }
 .scena-menu-popover { position: absolute; top: calc(100% + 8px); right: 0; }
+.scena-menu-popover--left { right: auto; left: 0; }
 
 /* ── Tooltip ────────────────────────────────────────── */
 .scena-tooltip {

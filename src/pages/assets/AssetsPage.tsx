@@ -3,10 +3,12 @@ import { Link } from "react-router-dom";
 import { Images, GridFour, List as ListIcon } from "@phosphor-icons/react";
 import { useManagerContext } from "../../app/ManagerContextProvider";
 import {
-  createAssetUpload, uploadAssetSource, finalizeAssetUpload, listAssets, waitForAsset,
+  createAssetUpload, uploadAssetSource, finalizeAssetUpload, getAssetPreview, listAssets, waitForAsset,
   MAX_ASSET_SOURCE_BYTES,
 } from "../../services/scena-api/assets";
 import type { AssetSummary, AssetStatus } from "../../services/scena-api/assets";
+import { isUploadableAsset } from "../../services/scena-api/assets";
+import { isScenaApiError } from "../../services/scena-api/errors";
 import { SCENA_UI_API_CAPABILITIES } from "../../services/scena-api/capabilities";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { SearchInput } from "../../components/ui/Input";
@@ -34,6 +36,7 @@ export function AssetsPage() {
   const context = useManagerContext();
   const toast = useToast();
   const [assets, setAssets] = useState<AssetSummary[] | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [error, setError] = useState<unknown>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -43,19 +46,34 @@ export function AssetsPage() {
 
   function load() {
     setError(null);
-    listAssets(context.workspace.id, statusFilter ? { status: statusFilter as AssetStatus } : {})
-      .then((res) => setAssets(res.assets))
+    const controller = new AbortController();
+    listAssets(context.workspace.id, statusFilter ? { status: statusFilter as AssetStatus, signal: controller.signal } : { signal: controller.signal })
+      .then(async (res) => {
+        setAssets(res.assets);
+        const previews = await Promise.all(res.assets.filter((asset) => asset.status === "ready").map(async (asset) => {
+          try {
+            const preview = await getAssetPreview(asset.id, { signal: controller.signal });
+            return [asset.id, preview.signed_url] as const;
+          } catch {
+            return null;
+          }
+        }));
+        if (!controller.signal.aborted) {
+          setPreviewUrls(Object.fromEntries(previews.filter((entry): entry is readonly [string, string] => entry !== null)));
+        }
+      })
       .catch(setError);
+    return () => controller.abort();
   }
 
-  useEffect(load, [context.workspace.id, statusFilter]);
+  useEffect(() => load(), [context.workspace.id, statusFilter]);
 
   function updateQueueItem(key: string, patch: Partial<FileQueueItemDef>) {
     setQueue((prev) => prev.map((item) => (item.key === key ? { ...item, ...patch } : item)));
   }
 
   async function handleFiles(files: File[]) {
-    for (const file of files) {
+    for (const file of files.filter(isUploadableAsset)) {
       const key = `upload-${++queueSeq.current}`;
       setQueue((prev) => [...prev, { key, name: file.name, status: "uploading", statusLabel: "Uploading…" }]);
       uploadOne(key, file).catch(() => {});
@@ -73,6 +91,12 @@ export function AssetsPage() {
       toast.show(`${detail.asset.original_filename} is ready`, "success");
       load();
     } catch (err) {
+      if (isScenaApiError(err) && err.code === "PROCESSING_TIMEOUT") {
+        updateQueueItem(key, { status: "processing", statusLabel: "Still processing in the background" });
+        load();
+        toast.show(`${file.name} is still processing in the background`, "info");
+        return;
+      }
       const message = err instanceof Error ? err.message : "Upload failed.";
       updateQueueItem(key, { status: "failed", statusLabel: message });
       toast.show(message, "danger");
@@ -87,6 +111,7 @@ export function AssetsPage() {
 
       <UploadDropzone
         onFiles={handleFiles}
+        accept="image/*,.pdf,.ppt,.pptx"
         hint={`Images, PDF, and PowerPoint up to ${Math.round(MAX_ASSET_SOURCE_BYTES / (1024 * 1024))} MB. The monthly upload count is consumed only after a file finishes uploading — a failed upload doesn't count against your quota.`}
       />
       <FileQueue items={queue} />
@@ -124,7 +149,7 @@ export function AssetsPage() {
           {filtered.map((asset) => (
             <Link key={asset.id} to={`/app/assets/${asset.id}`} style={{ display: "block" }}>
               <GridCard
-                thumb={<Images size={28} />}
+                thumb={previewUrls[asset.id] ? <img src={previewUrls[asset.id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Images size={28} />}
                 title={asset.original_filename}
                 meta={<StatusIndicator status={asset.status} />}
               />

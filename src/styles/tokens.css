@@ -60,7 +60,11 @@
 
   /* Gradients */
   --scena-gradient-primary: linear-gradient(135deg, #7eb3ff 0%, #5b7cfa 45%, #3d5ff0 100%);
-  --scena-gradient-violet: linear-gradient(135deg, #3554e8 0%, #4a6cf5 55%, #7c9aff 100%);
+  /* Text-bearing gradient: every stop must clear WCAG AA 4.5:1 against #fff,
+     because .scena-btn--primary (components.css) paints white label text
+     across the whole sweep. Measured white-on-stop ratios: 5.86:1 / 5.67:1 /
+     4.85:1. The old light end (#7c9aff) measured 2.65:1 and failed. */
+  --scena-gradient-violet: linear-gradient(135deg, #3554e8 0%, #4055ea 55%, #4a63f0 100%);
   --scena-gradient-surface: linear-gradient(145deg, rgba(126, 179, 255, 0.08), rgba(91, 124, 250, 0.08) 45%, rgba(61, 95, 240, 0.12));
 
   /* Shadows */

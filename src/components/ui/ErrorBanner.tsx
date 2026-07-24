@@ -55,6 +55,22 @@ function friendlyTitle(code?: string): string {
       return "Monthly upload limit reached";
     case "ASSET_TOO_LARGE":
       return "File too large";
+    case "UNSUPPORTED_ASSET_TYPE":
+      return "File type not supported";
+    case "SOURCE_UPLOAD_FAILED":
+      return "Upload could not be completed";
+    case "UPLOAD_INCOMPLETE":
+      return "Upload is incomplete";
+    case "ASSET_NOT_FOUND":
+      return "Asset not found";
+    case "VARIANT_NOT_FOUND":
+      return "Preview unavailable";
+    case "PREVIEW_NOT_AVAILABLE":
+      return "Preview is still processing";
+    case "PROCESSING_FAILED":
+      return "Asset processing failed";
+    case "PROCESSING_TIMEOUT":
+      return "Asset is still processing";
     case "BOARD_LIMIT_REACHED":
       return "Board limit reached";
     case "BOARD_VERSION_CONFLICT":

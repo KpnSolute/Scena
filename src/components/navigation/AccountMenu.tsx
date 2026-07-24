@@ -25,7 +25,11 @@ export function AccountMenu({ context }: { context: ManagerContext }) {
 
   return (
     <DropdownMenu
-      trigger={<Avatar name={name} src={context.profile.avatarUrl} size="md" />}
+      trigger={
+        <button type="button" className="scena-account-trigger" aria-label="Account menu">
+          <Avatar name={name} src={context.profile.avatarUrl} size="md" />
+        </button>
+      }
       items={[
         { key: "identity", disabled: true, label: <AccountHeader name={name} email={email} planCode={context.workspace.entitlements?.plan_code} /> },
         { key: "sep-1", disabled: true, label: <MenuSeparator /> },

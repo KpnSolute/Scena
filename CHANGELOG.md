@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-07-24 — Board Editor configuration and live-session workflow
+
+Aligned persisted Board Element configuration with the typed renderer contracts, including backward-compatible reads for existing Boards. Added typography controls, scene duration and transition controls, working QR-link and ticker/countdown configuration, and explicit preview-only treatment for weather, video, music player, and live data text. Updated the SOP tier capability matrix and sales representation rules.
+
+## 2026-07-24 — Manager Asset Library
+
+Added the first workspace-aware Asset Library using the typed v1.0.15 Workspace and Asset clients. Managers can list Assets for the selected Workspace, upload supported images/PDF/PowerPoint files through signed Storage URLs, finalize uploads, see processing status, and preview ready variants. Unsupported media types remain hidden from the upload picker, and stable API error codes are shown with actionable state labels. New Asset work does not call the legacy `presentation-upload` endpoint.
+
 ## 2026-07-23
 
 - Board editor asset slice: render signed image and PowerPoint/PDF page previews on the canvas, show real upload thumbnails, and add local emoji/GIF-style library tiles alongside preset shapes.
