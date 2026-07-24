@@ -4,8 +4,8 @@
 // whole drag gesture is one undo step, not one per pixel of movement.
 import { useRef, useState } from "react";
 import type { BoardScene, SceneElement, ShapeVariant } from "../../services/scena-api/boards";
-import { readBorderConfig, readShapeConfig } from "../../services/scena-api/boards";
-import { ElementBody } from "./ElementBody";
+import { readBorderConfig, readMediaConfig, readShapeConfig } from "../../services/scena-api/boards";
+import { getElementRenderer, type ElementRendererProps } from "./elements";
 
 type DragKind = "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se" | "rotate";
 
@@ -143,10 +143,17 @@ export function EditorCanvas({
               // deselect-on-click and instantly undo the selection.
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="scena-editor__element-body" style={elementBodyStyle(element)}>
-                {element.element_type === "shape"
-                  ? <ShapeBody element={element} />
-                  : <ElementBody element={element} assetUrl={assetPreviewUrls?.get(element.asset_page_id ?? element.asset_id ?? "")} />}
+              <div className="scena-editor__element-body" style={elementBodyStyle(element, scale)}>
+                {element.element_type === "shape" ? (
+                  <ShapeBody element={element} />
+                ) : (
+                  <ElementRendererFor
+                    element={element}
+                    assetUrl={assetPreviewUrls?.get(element.asset_page_id ?? element.asset_id ?? "")}
+                    assetUrls={assetPreviewUrls}
+                    scale={scale}
+                  />
+                )}
               </div>
               {isSelected && !element.is_locked && (
                 <>
@@ -169,26 +176,42 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max));
 }
 
-function elementColor(element: SceneElement): string {
-  if (element.element_type === "shape") return "rgba(91,124,250,.35)";
-  if (element.element_type === "image" || element.element_type === "asset_page") return "rgba(126,179,255,.16)";
-  return "rgba(255,255,255,.06)";
+/** Element types whose config carries a MediaConfig (fit/corner_radius/alt)
+ * — the generic wrapper below rounds their corners to match. */
+const MEDIA_LIKE_TYPES: ReadonlySet<SceneElement["element_type"]> = new Set([
+  "image", "asset_page", "carousel", "video",
+]);
+
+// Looks up the registered presentational renderer for a non-shape element
+// type. Every ElementType but "shape" has an entry (shape keeps its own SVG
+// path below); the fallback only guards against a future type landing in
+// the union before a renderer is registered for it.
+function ElementRendererFor(props: ElementRendererProps) {
+  const Renderer = getElementRenderer(props.element.element_type);
+  if (!Renderer) {
+    return <span className="scena-editor__renderer-fallback">Unsupported element</span>;
+  }
+  return <Renderer {...props} />;
 }
 
-// Borders are a generic element property (task: "a text or image element
-// should be able to have a border too"), honored for every element type —
+// Borders are a generic element property, honored for every element type —
 // except shape, which draws its own border as part of its SVG geometry
 // below (a plain CSS border on this box would fight with non-rectangular
-// shapes: clip-path/SVG clipping clips a CSS border clean away).
-function elementBodyStyle(element: SceneElement): React.CSSProperties {
+// shapes: clip-path/SVG clipping clips a CSS border clean away). Border
+// width and (for media-like types) corner radius are authored in
+// canvas-reference px, so both are multiplied by `scale` — the canvas's
+// current px-per-reference-px factor — to render at the correct physical
+// size at any zoom level.
+function elementBodyStyle(element: SceneElement, scale: number): React.CSSProperties {
   if (element.element_type === "shape") return {};
   const border = readBorderConfig(element);
+  const cornerRadius = MEDIA_LIKE_TYPES.has(element.element_type) ? readMediaConfig(element).corner_radius : 0;
   return {
-    background: elementColor(element),
     boxSizing: "border-box",
-    borderWidth: border.border_width,
+    borderWidth: border.border_width * scale,
     borderStyle: border.border_width > 0 ? border.border_style : "none",
     borderColor: border.border_color,
+    borderRadius: cornerRadius > 0 ? `${cornerRadius * scale}px` : undefined,
   };
 }
 

@@ -357,13 +357,14 @@ export function BoardEditorPage() {
       </div>
 
       {scenesVisible && (
-        <SceneStrip
-          scenes={snapshot.scenes}
-          selectedSceneId={scene?.id ?? null}
-          onSelect={editor.setSelectedSceneId}
-          onAddScene={handleAddScene}
-          onReorder={editor.reorderScenes}
-        />
+      <SceneStrip
+        scenes={snapshot.scenes}
+        selectedSceneId={scene?.id ?? null}
+        onSelect={editor.setSelectedSceneId}
+        onAddScene={handleAddScene}
+        onReorder={editor.reorderScenes}
+        onUpdateScene={(sceneId, patch) => editor.updateScene(sceneId, patch)}
+      />
       )}
 
       <EditorBottomBar

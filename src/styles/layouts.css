@@ -1,0 +1,116 @@
+/* Layouts management — list page and the percentage-based tile canvas on
+   the Layout detail page. Tokens only, no raw hex/px per the design system
+   contract (tokens.css). */
+
+.scena-field-flex { flex: 1; }
+
+.scena-layout-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--scena-radius-xs);
+  border: 1px solid var(--scena-border-strong);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.scena-layout-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: var(--scena-space-6);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .scena-layout-detail-grid { grid-template-columns: 1fr; }
+}
+
+.scena-layout-canvas-wrap {
+  width: 100%;
+  border-radius: var(--scena-radius-lg);
+  border: 1px solid var(--scena-border);
+  background: repeating-conic-gradient(var(--scena-surface-2) 0% 25%, var(--scena-surface-1) 0% 50%) 50% / 24px 24px;
+  padding: var(--scena-space-4);
+}
+
+.scena-layout-canvas {
+  position: relative;
+  width: 100%;
+  max-height: 70vh;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: var(--scena-radius-md);
+  border: 1px solid var(--scena-border-strong);
+  box-shadow: var(--scena-shadow-md);
+}
+
+.scena-layout-tile {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  border: 1.5px solid rgba(181, 198, 253, 0.45);
+  background: rgba(91, 124, 250, 0.14);
+  padding: var(--scena-space-1);
+  text-align: left;
+  transition: border-color var(--scena-duration-fast), background var(--scena-duration-fast), box-shadow var(--scena-duration-fast);
+}
+.scena-layout-tile:hover { border-color: var(--scena-border-focus); background: rgba(91, 124, 250, 0.22); }
+.scena-layout-tile:focus-visible { outline: none; box-shadow: var(--scena-focus-ring); }
+.scena-layout-tile--selected { border-color: var(--scena-brand); background: rgba(91, 124, 250, 0.30); box-shadow: 0 0 0 2px var(--scena-brand); }
+.scena-layout-tile--hidden { opacity: 0.4; border-style: dashed; }
+
+.scena-layout-tile__label {
+  font-size: var(--scena-text-xs);
+  font-weight: 600;
+  color: var(--scena-text-primary);
+  background: var(--scena-glass-strong);
+  padding: 2px 6px;
+  border-radius: var(--scena-radius-xs);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scena-layout-tile-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--scena-space-2);
+  margin-top: var(--scena-space-4);
+}
+
+.scena-layout-tile-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--scena-space-3);
+  width: 100%;
+  text-align: left;
+  padding: var(--scena-space-3);
+  border-radius: var(--scena-radius-md);
+  border: 1px solid var(--scena-border);
+  background: var(--scena-surface-1);
+  transition: border-color var(--scena-duration-fast), background var(--scena-duration-fast);
+}
+.scena-layout-tile-list__item:hover { background: var(--scena-surface-hover); }
+.scena-layout-tile-list__item[data-selected="true"] { border-color: var(--scena-brand); background: rgba(91, 124, 250, 0.10); }
+.scena-layout-tile-list__meta { flex: 1; min-width: 0; }
+.scena-layout-tile-list__name { font-size: var(--scena-text-sm); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scena-layout-tile-list__sub { font-size: var(--scena-text-xs); color: var(--scena-text-muted); }
+
+.scena-layout-tile-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--scena-space-4);
+}
+
+.scena-layout-tile-editor__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--scena-space-3);
+}
+
+.scena-layout-tile-editor__zorder {
+  display: flex;
+  align-items: center;
+  gap: var(--scena-space-2);
+}

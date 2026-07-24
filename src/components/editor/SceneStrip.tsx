@@ -1,6 +1,9 @@
 import { Plus, EyeSlash, CaretLeft, CaretRight } from "@phosphor-icons/react";
 import type { BoardScene } from "../../services/scena-api/boards";
+import type { TransitionType } from "../../services/scena-api/boards";
 import { IconButton } from "../ui/Button";
+import { Input } from "../ui/Input";
+import { Select } from "../ui/Select";
 
 export interface SceneStripProps {
   scenes: BoardScene[];
@@ -8,9 +11,11 @@ export interface SceneStripProps {
   onSelect: (sceneId: string) => void;
   onAddScene: () => void;
   onReorder: (sceneId: string, direction: "left" | "right") => void;
+  onUpdateScene?: (sceneId: string, patch: Partial<Pick<BoardScene, "duration_ms" | "transition_type">>) => void;
 }
 
-export function SceneStrip({ scenes, selectedSceneId, onSelect, onAddScene, onReorder }: SceneStripProps) {
+export function SceneStrip({ scenes, selectedSceneId, onSelect, onAddScene, onReorder, onUpdateScene = () => {} }: SceneStripProps) {
+  const selected = scenes.find((scene) => scene.id === selectedSceneId) ?? null;
   return (
     <div className="scena-editor__scene-strip">
       {scenes.map((scene, index) => (
@@ -45,6 +50,12 @@ export function SceneStrip({ scenes, selectedSceneId, onSelect, onAddScene, onRe
         </div>
       ))}
       <IconButton icon={<Plus size={20} />} label="Add scene" onClick={onAddScene} />
+      {selected && (
+        <div className="scena-editor__scene-settings" onClick={(event) => event.stopPropagation()}>
+          <label>Scene duration <Input type="number" min={1} max={86400} value={Math.round(selected.duration_ms / 1000)} onChange={(event) => onUpdateScene(selected.id, { duration_ms: Math.max(1000, Number(event.target.value) * 1000) })} /></label>
+          <label>Transition <Select value={selected.transition_type as TransitionType} options={[{ value: "none", label: "None" }, { value: "fade", label: "Fade" }, { value: "slide_left", label: "Slide left" }, { value: "slide_right", label: "Slide right" }, { value: "zoom", label: "Zoom" }, { value: "dissolve", label: "Dissolve" }]} onChange={(event) => onUpdateScene(selected.id, { transition_type: event.target.value as TransitionType })} /></label>
+        </div>
+      )}
     </div>
   );
 }
