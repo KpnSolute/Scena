@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-07-30 - Pin Supabase MCP project target
+
+Pinned `.mcp.json` to Scena's own Supabase project (`zglbgqeccebqnijcqfkb`)
+instead of allowing a shared `SUPABASE_PROJECT_REF` variable to select the
+target. Credentials remain environment-provided and are not stored in the
+repository.
+
 ## 2026-07-24 — Board Editor configuration and live-session workflow
 
 Aligned persisted Board Element configuration with the typed renderer contracts, including backward-compatible reads for existing Boards. Added typography controls, scene duration and transition controls, working QR-link and ticker/countdown configuration, and explicit preview-only treatment for weather, video, music player, and live data text. Updated the SOP tier capability matrix and sales representation rules.
