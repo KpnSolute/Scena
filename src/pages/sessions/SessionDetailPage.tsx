@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Broadcast, Check, Monitor, PencilSimple, Play, Plus, Star, Stop, Trash, X } from "@phosphor-icons/react";
+import { ArrowLeft, Broadcast, Check, Monitor, PencilSimple, Play, Plus, Star, Stop, Trash, Warning, X } from "@phosphor-icons/react";
 import { useManagerContext } from "../../app/ManagerContextProvider";
 import { canManage } from "../../auth/organization-context";
 import * as Sessions from "../../domain/sessions";
+import * as Control from "../../domain/sessionControl";
 import * as Screens from "../../domain/screens";
 import * as Layouts from "../../domain/layouts";
 import * as Boards from "../../services/scena-api/boards";
@@ -50,11 +51,19 @@ export function SessionDetailPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
 
-  // Lifecycle action state
-  const [starting, setStarting] = useState(false);
-  const [stopping, setStopping] = useState(false);
+  // Lifecycle action state. `busy` holds the state currently being requested,
+  // so each control can show its own spinner without a boolean per action.
+  const [busy, setBusy] = useState<Control.SessionState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Control-room data. Every one of these is an authority the DATABASE owns;
+  // none of it is recomputed here. See docs/implementation/SCENA_FULL_SYSTEM_PROGRAM.md §2.3.
+  const [readiness, setReadiness] = useState<Control.ReadinessCheck[] | null>(null);
+  const [events, setEvents] = useState<Control.SessionEvent[] | null>(null);
+  const [health, setHealth] = useState<Map<string, Control.DisplayHealth>>(new Map());
+  const [entitlements, setEntitlements] = useState<Control.EffectiveEntitlements | null>(null);
+  const [usage, setUsage] = useState<Control.WorkspaceUsage | null>(null);
 
   // Add-display state
   const [addOpen, setAddOpen] = useState(false);
@@ -85,6 +94,14 @@ export function SessionDetailPage() {
           Screens.listScreens(context.workspace.id, result.location_id).then(setLocationScreens),
           Layouts.listLayouts(context.workspace.id, result.location_id).then(setLocationLayouts),
           Boards.listBoards(context.workspace.id).then(({ boards }) => setWorkspaceBoards(boards)),
+          // Control-room data. These are surfaced read-only and must never
+          // block the page: a Session still renders if its timeline or health
+          // is briefly unavailable.
+          Control.getSessionReadiness(result.id).then(setReadiness).catch(() => setReadiness(null)),
+          Control.listSessionEvents(context.workspace.id, result.id, 40).then(setEvents).catch(() => setEvents(null)),
+          Control.getDisplayHealth(context.workspace.id).then(setHealth).catch(() => setHealth(new Map())),
+          Control.getEffectiveEntitlements(context.workspace.id).then(setEntitlements).catch(() => setEntitlements(null)),
+          Control.getWorkspaceUsage(context.workspace.id).then(setUsage).catch(() => setUsage(null)),
         ]);
       })
       .catch(setError);
@@ -110,33 +127,47 @@ export function SessionDetailPage() {
     }
   }
 
-  // Status machine (from src/domain/sessions.ts): draft -> active (start),
-  // active -> stopped (stop), draft-only delete. 'stopped' is terminal and
-  // the handle_display_session_status trigger releases all screens on stop.
-  async function start() {
-    if (!session) return;
-    setStarting(true);
+  // Lifecycle is driven entirely by public.session_transition(). The database
+  // owns the transition table, the readiness gate, the role check and the audit
+  // event, so each control here is one call — never an orchestration.
+  async function moveTo(...steps: Control.SessionState[]) {
+    if (!session || steps.length === 0) return;
+    const target = steps[steps.length - 1];
+    setBusy(target);
     try {
-      await Sessions.startSession(context.workspace.id, session.id, context.userId);
+      for (const step of steps) {
+        await Control.transitionSession(context.workspace.id, session.id, step);
+      }
       refresh();
     } catch (err) {
-      showError(err, "Couldn't start Session.");
+      showError(err, `Couldn't move this Session to ${Control.sessionStateLabel(target).toLowerCase()}.`);
+      refresh();
     } finally {
-      setStarting(false);
+      setBusy(null);
     }
   }
 
-  async function stop() {
+  // Starting walks draft -> ready -> starting -> active. Each hop is validated
+  // separately; the readiness gate fires on entry to 'starting', so a Session
+  // that is not ready fails there with the specific blocking reason.
+  function start() {
     if (!session) return;
-    setStopping(true);
-    try {
-      await Sessions.stopSession(context.workspace.id, session.id, context.userId);
-      refresh();
-    } catch (err) {
-      showError(err, "Couldn't stop Session.");
-    } finally {
-      setStopping(false);
+    switch (session.status as Control.SessionState) {
+      case "paused":
+        return void moveTo("active");
+      case "ready":
+        return void moveTo("starting", "active");
+      case "draft":
+      case "stopped":
+      case "failed":
+        return void moveTo("ready", "starting", "active");
+      default:
+        return;
     }
+  }
+
+  function stop() {
+    void moveTo("stopping", "stopped");
   }
 
   async function deleteDraft() {
@@ -301,9 +332,18 @@ export function SessionDetailPage() {
   const layoutNames = new Map((locationLayouts ?? []).map((layout) => [layout.id, layout.name]));
   const assignedIds = new Set(session.screens.map((screen) => screen.screen_id));
   const addableScreens = (availableScreens ?? []).filter((screen) => !assignedIds.has(screen.id));
-  // Screen composition is meaningless once a session stops — the status
-  // trigger already released every screen — so composer edits stop there.
-  const composable = manage && session.status !== "stopped";
+  // Screen composition is meaningless once a Session stops or is archived —
+  // the status trigger already released every screen — so composer edits stop
+  // there.
+  const composable = manage && session.status !== "stopped" && session.status !== "archived";
+  // Readiness verdict comes from public.session_readiness(). `blocking` on each
+  // row already separates "must fix" from "worth knowing", so nothing is
+  // re-judged here.
+  const blockingFailures = (readiness ?? []).filter((check) => !check.passed && check.blocking);
+  const readinessWarnings = (readiness ?? []).filter((check) => !check.passed && !check.blocking);
+  const canStart = Control.canTransition(session.status as Control.SessionState, "ready")
+    || Control.canTransition(session.status as Control.SessionState, "starting")
+    || session.status === "paused";
   // Mirrors resolveDisplayState.ts: duplicate/extend resolve every screen's
   // layout from the session's shared_layout_id, ignoring per-screen layout_id.
   const usesSharedLayout = session.display_mode === "duplicate" || session.display_mode === "extend";
@@ -336,7 +376,7 @@ export function SessionDetailPage() {
       ) : (
         <PageHeader
           title={session.name}
-          description={`Created ${new Date(session.created_at).toLocaleString()}`}
+          description={`${Control.sessionStateLabel(session.status)} · created ${new Date(session.created_at).toLocaleString()}`}
           actions={
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <StatusIndicator status={session.status} />
@@ -353,14 +393,53 @@ export function SessionDetailPage() {
                   Rename
                 </Button>
               )}
-              {manage && session.status === "draft" && (
-                <Button variant="primary" size="sm" icon={<Play size={16} />} loading={starting} onClick={start}>
-                  Start
+              {/* Controls mirror private.session_transition_allowed(). The
+                  database still has the final say, so a control that is shown
+                  can still be refused — with a specific reason. */}
+              {manage && canStart && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Play size={16} />}
+                  loading={busy === "active"}
+                  disabled={busy !== null || (blockingFailures.length > 0 && session.status !== "paused")}
+                  onClick={start}
+                >
+                  {session.status === "paused" ? "Resume" : "Start"}
                 </Button>
               )}
-              {manage && session.status === "active" && (
-                <Button variant="danger" size="sm" icon={<Stop size={16} />} loading={stopping} onClick={stop}>
+              {manage && Control.canTransition(session.status as Control.SessionState, "paused") && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={busy === "paused"}
+                  disabled={busy !== null}
+                  onClick={() => void moveTo("paused")}
+                >
+                  Pause
+                </Button>
+              )}
+              {manage && Control.canTransition(session.status as Control.SessionState, "stopping") && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon={<Stop size={16} />}
+                  loading={busy === "stopped"}
+                  disabled={busy !== null}
+                  onClick={stop}
+                >
                   Stop
+                </Button>
+              )}
+              {manage && Control.canTransition(session.status as Control.SessionState, "archived") && session.status !== "draft" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={busy === "archived"}
+                  disabled={busy !== null}
+                  onClick={() => void moveTo("archived")}
+                >
+                  Archive
                 </Button>
               )}
               {manage && session.status === "draft" && (
@@ -371,6 +450,88 @@ export function SessionDetailPage() {
             </div>
           }
         />
+      )}
+
+      {/* Readiness. Rendered verbatim from public.session_readiness() — the UI
+          does not decide what "ready" means, and must never filter a failing
+          check out of this list. */}
+      {readiness && (
+        <Card style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>
+              Readiness
+            </div>
+            <div style={{ fontSize: "var(--scena-text-sm)", color: "var(--scena-text-muted)" }}>
+              {blockingFailures.length === 0
+                ? `All ${readiness.length} checks passed`
+                : `${blockingFailures.length} of ${readiness.length} checks must be fixed before starting`}
+            </div>
+          </div>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+            {readiness.map((check) => (
+              <li
+                key={check.check_key}
+                style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "var(--scena-text-sm)" }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    flexShrink: 0,
+                    marginTop: 2,
+                    color: check.passed
+                      ? "var(--scena-success)"
+                      : check.blocking
+                        ? "var(--scena-danger)"
+                        : "var(--scena-warning)",
+                  }}
+                >
+                  {check.passed ? <Check size={16} /> : <Warning size={16} />}
+                </span>
+                <span style={{ color: check.passed ? "var(--scena-text-muted)" : "var(--scena-text)" }}>
+                  {check.message}
+                  <span className="scena-visually-hidden">
+                    {check.passed ? " — passed" : check.blocking ? " — must be fixed" : " — warning"}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {readinessWarnings.length > 0 && blockingFailures.length === 0 && (
+            <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
+              This Session can start. Warnings above will resolve on their own once every Display reports in.
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Plan context. Numbers come from workspace_effective_entitlements and
+          workspace_usage_current, which are the same values the database
+          enforces — so this panel cannot disagree with a rejected action. */}
+      {entitlements && usage && (
+        <Card style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>
+            Plan usage
+          </div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", fontSize: "var(--scena-text-sm)" }}>
+            <span>
+              Displays <strong>{usage.displays_used ?? 0}</strong> of {entitlements.max_displays}
+            </span>
+            <span>
+              Boards <strong>{usage.boards_used ?? 0}</strong> of {entitlements.max_boards}
+            </span>
+            <span>
+              Live Sessions <strong>{usage.active_sessions_used ?? 0}</strong> of {entitlements.max_concurrent_sessions}
+            </span>
+            <span>
+              Displays in this Session <strong>{session.screens.length}</strong> of {entitlements.max_displays_per_session}
+            </span>
+          </div>
+          {entitlements.has_override && (
+            <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
+              An approved limit override is active on this Workspace.
+            </div>
+          )}
+        </Card>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
@@ -484,7 +645,23 @@ export function SessionDetailPage() {
                     <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
                       Order {screen.screen_order}
                       {screen.rotation_degrees ? ` · ${screen.rotation_degrees}°` : ""}
+                      {/* Live health from display_health. "Not reported yet"
+                          is deliberate: an absent row means the Display has
+                          never heartbeated, which is different from offline. */}
+                      {(() => {
+                        const dh = health.get(screen.screen_id);
+                        if (!dh) return " · Not reported yet";
+                        const seen = dh.last_heartbeat_at
+                          ? new Date(dh.last_heartbeat_at).toLocaleTimeString()
+                          : "never";
+                        return ` · ${dh.connection_state === "online" ? "Online" : "Offline"} (${dh.health_state}), last seen ${seen}`;
+                      })()}
                     </div>
+                    {health.get(screen.screen_id)?.last_error_message_safe && (
+                      <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-danger)" }}>
+                        {health.get(screen.screen_id)?.last_error_message_safe}
+                      </div>
+                    )}
                   </div>
                   {usesSharedLayout ? (
                     <span style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
@@ -540,6 +717,43 @@ export function SessionDetailPage() {
           )}
         </Card>
       </div>
+
+      {/* Activity. Read straight from session_events, which is append-only and
+          has no write policy — so this timeline cannot have been edited. */}
+      <Card style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>
+          Activity
+        </div>
+        {events === null ? (
+          <Skeleton height={80} />
+        ) : events.length === 0 ? (
+          <div style={{ fontSize: "var(--scena-text-sm)", color: "var(--scena-text-muted)" }}>
+            Nothing has happened on this Session yet.
+          </div>
+        ) : (
+          <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {events.map((event) => (
+              <li
+                key={event.id}
+                style={{ display: "flex", gap: 12, alignItems: "baseline", fontSize: "var(--scena-text-sm)" }}
+              >
+                <time
+                  dateTime={event.occurred_at}
+                  style={{ flexShrink: 0, color: "var(--scena-text-muted)", fontSize: "var(--scena-text-xs)", minWidth: 130 }}
+                >
+                  {new Date(event.occurred_at).toLocaleString()}
+                </time>
+                <span>
+                  {Control.sessionEventLabel(event.event_type)}
+                  {event.actor_type !== "user" && (
+                    <span style={{ color: "var(--scena-text-muted)" }}> · {event.actor_type}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
 
       <Modal
         open={addOpen}

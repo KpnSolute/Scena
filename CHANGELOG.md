@@ -1,5 +1,73 @@
 # Changelog
 
+## 2026-07-31 — Session platform: lifecycle, readiness, health, history, groups, ACL, automation tiers, templates
+
+Eleven ordered, additive migrations turn the SOP's Session and plan promises
+into database-enforced behaviour. Applied to `zglbgqeccebqnijcqfkb` after each
+was dry-run against live schema and data in a rolled-back transaction.
+
+**Entitlement control plane.** New `plan_entitlements` holds the SOP §6 plan
+matrix as data; `organization_entitlements` became a projection of it, so a
+Workspace can no longer drift from its plan. New `workspace_limits_overrides`
+allows approved, raise-only numeric deviations that can never grant a gated
+capability. `private.effective_entitlements()` is now the single authority every
+quota check reads. Usage is a live view rather than a counter table.
+
+**Session lifecycle.** `display_sessions` gained the full ten-state lifecycle
+(draft → ready → starting → active ⇄ paused/degraded → stopping → stopped →
+archived, with failed and recovery), enforced by a database transition table.
+`starting`, `active`, `degraded` and `paused` all consume concurrent-Session
+capacity, so pausing no longer frees a slot the Session is still using.
+
+**Readiness.** `public.session_readiness()` returns a fourteen-check verdict with
+customer-safe messages, and gates entry to `starting`. Readiness is no longer
+inferred in TypeScript, so the start button and the database can no longer
+disagree.
+
+**Content-model fix.** Activation and screen assignment previously required a
+per-screen Layout in independent and single mode, which made a Session carrying
+a Board unable to start. A Display now has usable content if it carries a Layout
+**or** the Session carries a Board.
+
+**History and health.** New append-only `session_events` with no write policy —
+the timeline cannot be edited through the API. New `display_health` (current
+state) plus `display_health_events` (changes only, not per heartbeat), server-side
+health derivation in `ingest_display_heartbeat()`, and a `session_health_summary`
+rollup.
+
+**Max capabilities.** Display Groups, Session Groups and resource-level access
+control now exist with database-enforced entitlement gating. Group commands run
+member by member through the lifecycle command, so a group can never exceed the
+plan. Resource grants are additive only and can never narrow an Owner.
+
+**Automation.** Plan tiers (Pro = daily/weekly, Max = adds hourly and custom) are
+enforced at creation *and* re-checked at claim time, so a downgrade stops
+execution. New `automation_runs` with a unique `(automation_id, scheduled_for)`
+key makes execution idempotent; retries are bounded.
+
+**Templates.** Session templates store screen *slots*, never Displays, and always
+instantiate as drafts.
+
+**Optimisation.** Twelve indexes, most importantly one on
+`organization_members (user_id, org_id)` — every RLS policy in the schema
+resolves through it.
+
+Max remains **unavailable**: `plan_entitlements.availability` now records
+commercial availability as data, and working schema is not a shipped product.
+Groups, ACL, templates and automation execution have no manager UI yet.
+
+SOP amended: Purpose §3.8, §6.4, §6.6, §7.1, §9.6 and Stage 8; Roadmap §6 and
+§17. See `docs/implementation/SCENA_FULL_SYSTEM_PROGRAM.md` and
+`docs/implementation/SESSION_PLATFORM_ROLLOUT.md`.
+
+## 2026-07-30 - Guided Session builder
+
+Replaced the thin New Session form with a four-step builder for Basics,
+Displays, Behavior, and Review & launch. The builder uses the existing session
+domain APIs to select ready displays, configure single/duplicate/extend/
+independent behavior, assign layouts or an optional Board, validate the
+mode-specific requirements, and launch the configured Session.
+
 ## 2026-07-30 - Pin Supabase MCP project target
 
 Pinned `.mcp.json` to Scena's own Supabase project (`zglbgqeccebqnijcqfkb`)

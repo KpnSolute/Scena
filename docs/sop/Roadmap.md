@@ -4,8 +4,8 @@
 **Company:** KpnSolute
 **Service Owner:** Miah
 **Technical Delivery Support:** KpnCompute, where applicable
-**Version:** 1.2
-**Last Updated:** July 21, 2026
+**Version:** 1.3
+**Last Updated:** July 31, 2026
 **Status:** Pre-launch operating standard
 **Current Stage:** Stage 0, Foundation
 
@@ -163,6 +163,26 @@ Scena's public availability must be maintained separately from plan design.
 Until all conditions are met, a plan must be marked: Waitlist, Invite only, Pilot, Coming later, or Unavailable.
 
 **A Stripe price existing in the database does not prove the plan is ready to sell.**
+
+Since 2026-07-31 this rule is enforced as data rather than as a convention.
+`public.plan_entitlements.availability` carries each plan's commercial
+availability — `generally_available`, `limited`, `pilot`, `waitlist` or
+`unavailable` — alongside a note stating what must be true before it changes.
+
+Current values:
+
+| Plan | `availability` |
+|---|---|
+| Personal Free | `generally_available` |
+| Plus | `limited` |
+| Pro | `limited` |
+| Max | `unavailable` |
+
+Changing this field is a stage decision, not an engineering one. It requires a
+recorded Stage Transition (§12). **Max having working schema and enforcement for
+Groups, ACL and advanced automation is not the same as Max being deliverable.**
+The manager UI for those capabilities does not exist yet, so Max stays
+`unavailable`.
 
 ---
 
@@ -424,6 +444,17 @@ Every roadmap item must have one status: Researching, Proposed, Approved, In des
 **Current stage:** Stage 0, Foundation and First External Delivery.
 
 **Current verified capabilities:** Google authentication, profile provisioning, Personal no-Team state, plan listing, API v2 foundation, GitHub Actions CI, Stripe webhook reachability for at least one test event.
+
+**Stage 2 groundwork completed early (2026-07-31).** The database layer for
+Display Groups, Session Groups, resource-level access control, advanced
+automation tiers with execution history, Session lifecycle, readiness, health
+and history was implemented and verified. This was authorised as Category A/B
+work: it closes current-plan obligations (§3.2) and removes the "two
+disconnected content models" defect that blocked Board-to-Display delivery.
+
+It does **not** advance the stage. Stage 0 exit conditions are unchanged and
+unmet, and Max remains unavailable. See
+`docs/implementation/SCENA_FULL_SYSTEM_PROGRAM.md`.
 
 **Current blockers:** billing-checkout configuration or Stripe connectivity failure; no completed real Checkout Session; no webhook-provisioned Team; no verified paid entitlements; no fully verified Billing Portal; Display registration and pairing not fully verified; Board-to-Display first-customer workflow not fully verified; Max availability conflicts with unfinished advanced capabilities.
 

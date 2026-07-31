@@ -4,8 +4,8 @@
 **Company:** KpnSolute  
 **Service Owner:** Miah  
 **Technical Delivery Support:** KpnCompute, where applicable  
-**Version:** 1.3  
-**Last Updated:** July 22, 2026  
+**Version:** 1.4  
+**Last Updated:** July 31, 2026  
 **Status:** Pre-launch operating standard
 
 ---
@@ -145,6 +145,29 @@ Examples include images, videos, PowerPoint source files, rendered slide images,
 
 A Session is the live-control relationship that determines which Board or content state is shown on one or more Displays.
 
+A Session moves through a defined lifecycle, enforced by the database:
+
+| State | Meaning |
+|---|---|
+| `draft` | Being configured. Holds no Displays. |
+| `ready` | Readiness proven. Not yet driving Displays. |
+| `starting` | Being brought live. |
+| `active` | Live. Displays are showing its content. |
+| `degraded` | Live, but one or more Displays are unhealthy. |
+| `paused` | Held. Still owns its Displays. |
+| `stopping` | Being taken down. |
+| `stopped` | Finished. Displays released, history preserved. |
+| `failed` | Could not start or could not continue. Recoverable. |
+| `archived` | Retired. Terminal. |
+
+Only the transitions defined in the implementation program are permitted, and
+they are enforced server-side. Recovery from `failed` always returns to `ready`,
+never straight to `active`: readiness must be re-proven before Displays are
+driven again.
+
+A Session's operational history is recorded as an append-only event log. That
+log cannot be edited or deleted through the application.
+
 ---
 
 ## 4. Standard Account Provisioning
@@ -277,7 +300,19 @@ Max is intended for organizations coordinating multiple Displays, Sessions, sche
 
 Every Session is limited to four active Displays regardless of Workspace plan.
 
-Session Groups do not provide additional concurrent-Session capacity.
+This four-Display cap is not overridable by any means. It is excluded from the
+approved limit-override mechanism in §7.1.
+
+Session Groups do not provide additional concurrent-Session capacity. A group
+command is executed one member Session at a time, so every per-Session limit
+still applies to every member.
+
+**States that consume concurrent-Session capacity.** A Session consumes one
+concurrent-Session slot in every state where it still holds its Displays:
+`starting`, `active`, `degraded` and `paused`. Pausing a Session does not
+release its Displays and therefore does not free capacity. `draft`, `ready`,
+`stopping` once complete, `stopped`, `failed` and `archived` hold nothing and
+consume nothing.
 
 ### 6.5 Board editing capability matrix
 
@@ -293,6 +328,24 @@ Board editing is a persisted Workspace capability. Board scenes, element geometr
 | Revisions and version-conflict recovery | Yes | Yes | Yes | Yes |
 | Weather, video, music player, live data text | Preview only | Preview only | Preview only | Preview only |
 | Board publication workflow | Not available | Not available | Not available | Not available |
+
+### 6.6 Session templates
+
+A Session template stores the *shape* of a Session — display mode, Board,
+fallback policy and an ordered set of screen slots — so a recurring
+configuration can be recreated without rebuilding it by hand.
+
+Session templates are included in **Pro** and **Max**. They are not included in
+Personal Free or Plus.
+
+A template stores screen **slots**, never specific Displays. A slot describes
+order, primary status, viewport, rotation and content; the operator binds a real
+Display when the template is used. Storing a Display in a template would mean
+instantiating it later either fails, because that Display was revoked, or seizes
+a Display that is currently showing something else.
+
+Creating a Session from a template always produces a **draft**. A template can
+never bypass the readiness requirements in §15 Stage 8.
 
 Weather, video, music player, and live data text controls may save configuration and render designed previews, but they must state that no live data source is connected. Scena must not display invented weather, media playback, or data values on a customer Display. Time, date, countdown, ticker, QR, scene transitions, and ready Asset previews are supported Board behavior and are pushed to active Sessions when the Board is saved.
 
@@ -326,6 +379,29 @@ When a limit is reached:
 - The user may reduce active usage, purchase another Personal Workspace, or create a Team Workspace.
 
 The exact storage-byte limit, file-size limit, and retention period must not be invented in the UI or sales material until separately approved.
+
+### 7.1 Approved limit overrides
+
+A Workspace may be granted an approved deviation from its plan's **numeric**
+limits — for example a documented pilot that needs more Displays than its plan
+allows.
+
+An override:
+
+- May only **raise** a numeric limit. It can never lower one. A request to
+  reduce a Workspace below its plan entitlement is a plan change, not an
+  override.
+- May never grant a **capability**. Display Groups, Session Groups, resource
+  access controls, Session templates and automation tier come from the plan
+  alone. Granting one through an override would be selling a Max feature without
+  a Max subscription, which the Roadmap SOP §3.1 forbids.
+- May never raise the four-Display Session cap in §6.4.
+- Must record who approved it and why, and may carry an expiry.
+- Is visible to the Workspace's members, so nobody is operating under limits
+  they cannot see.
+
+Personnel must not raise a customer's limits to work around a defect. Fix the
+defect.
 
 ---
 
@@ -395,6 +471,29 @@ A Designer does not control live Displays by default.
 ### 9.5 Viewer
 
 A Viewer may view permitted Boards, Display status, Session status, and allowed Team information. A Viewer may not change Team resources.
+
+### 9.6 Resource-level permissions (Max)
+
+A Max Workspace may grant a specific member additional access to a specific
+resource — for example giving a Designer operator control of one Session.
+
+Resource grants are **additive only**. A grant may raise a member's access to
+one resource; it can never lower it below what their Team role already carries.
+The roles in §9.1–§9.5 define what each role may do across the Workspace, and a
+per-resource denial would silently contradict that while creating lockouts with
+no safe recovery path.
+
+Workspace Owners and Admins always resolve to full access on every resource. No
+grant can narrow an Owner or Admin. This is the recovery path required by §9.1:
+an Owner can never be locked out of their own Workspace by a grant someone else
+created.
+
+Only Owners and Admins may create, change or revoke a grant. A grant may only
+name a person who is already an active member of that Workspace — it is not a
+way to admit an outsider.
+
+On Personal Free, Plus and Pro this layer is inert: the Team role is the whole
+answer.
 
 ---
 
@@ -672,9 +771,20 @@ Verification:
 2. User adds a paired Display.
 3. User assigns the Board.
 4. User previews the state.
-5. User starts the Session or performs Take.
-6. Display retrieves authoritative state.
-7. Physical screen shows the correct content.
+5. User reviews the readiness checklist and clears every blocking item.
+6. User starts the Session or performs Take.
+7. Display retrieves authoritative state.
+8. Physical screen shows the correct content.
+
+**Readiness is authoritative and server-side.** A Session cannot be started
+while any blocking readiness check fails. The checklist covers Workspace
+ownership, enabled Displays, pairing state, assignment conflicts, display-mode
+validity, content assignment, Asset processing, plan capacity, concurrent-Session
+allowance, operator permission and fallback validity.
+
+The application renders that checklist. It must not compute its own opinion of
+whether a Session is ready — a second implementation is a second answer, and
+customers would see a start button that fails.
 
 Verification:
 

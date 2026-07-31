@@ -85,6 +85,15 @@ export async function createAutomation(orgId: string, locationId: string, input:
       target_session_screen_id: input.target_session_screen_id ?? null,
       target_layout_id: input.target_layout_id ?? null,
       target_display_mode: input.target_display_mode ?? null,
+      // Every automation created here targets a Session. schedule_kind drives
+      // the plan-tier check in enforce_automation_entitlement(): 'once' is
+      // allowed on Pro and Max, 'custom' (an arbitrary cron) on Max only.
+      // Narrower kinds — daily, weekly, hourly — are set by the scheduling UI
+      // once it can express them; defaulting to 'custom' never grants more than
+      // the plan allows.
+      target_type: "session" as const,
+      target_id: input.session_id,
+      schedule_kind: schedule.schedule_type === "once" ? ("once" as const) : ("custom" as const),
       ...schedule,
       next_run_at: schedule.schedule_type === "once" ? schedule.run_once_at : null, // cron rows get next_run_at computed by the worker
     })
