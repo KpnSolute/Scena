@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-31 — Session platform follow-up: FK index coverage sweep
+
+Post-merge review of the session-platform series found two real unindexed
+foreign keys: `session_template_slots.org_id` (backs an RLS predicate — the
+same pattern that made `organization_members(user_id, org_id)` the highest-
+value index in the series) and `automation_runs.session_id` (backs the
+"runs for this Session" query pattern). Both indexed. The migration tracking
+table (`supabase_migrations.schema_migrations`) was also backfilled with all
+12 of this series' migrations, which had been applied via direct SQL
+execution and were missing from Supabase's own tracked history — `supabase
+migration list --linked` now shows full local/remote agreement.
+
 ## 2026-07-31 — Session platform: lifecycle, readiness, health, history, groups, ACL, automation tiers, templates
 
 Eleven ordered, additive migrations turn the SOP's Session and plan promises
