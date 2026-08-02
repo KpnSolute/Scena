@@ -84,6 +84,26 @@ export async function sendEmailSignInLink(email: string, redirectTo = resolveAut
   if (error) throw error;
 }
 
+/**
+ * Drops the locally persisted session without contacting the Auth server.
+ *
+ * A stored token can be structurally valid and unexpired while the session
+ * behind it no longer exists server-side — revoked from another device, an
+ * inactivity timebox, or a rotated JWT signing key. PostgREST still accepts
+ * the signature, so table reads keep working, but every Edge Function calls
+ * `auth.getUser()` and gets 401. Keeping that token only makes the app look
+ * signed in while half of it is broken.
+ */
+export async function clearLocalSession(): Promise<void> {
+  await requireSupabase().auth.signOut({ scope: "local" });
+}
+
 export async function signOut(): Promise<void> {
-  await requireSupabase().auth.signOut();
+  const client = requireSupabase();
+  const { error } = await client.auth.signOut();
+
+  // A global sign-out calls the Auth server, which fails when the session was
+  // already revoked there. Without this fallback the stale token survives and
+  // the user is stranded on a page whose only control just failed silently.
+  if (error) await client.auth.signOut({ scope: "local" });
 }

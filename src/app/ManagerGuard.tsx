@@ -10,6 +10,8 @@ import {
   toManagerContext,
   type AccountContext,
 } from "../auth/organization-context";
+import { ScenaApiError } from "../services/scena-api/errors";
+import { clearLocalSession } from "../auth/session";
 import { ManagerContextProvider } from "./ManagerContextProvider";
 
 export type GuardState =
@@ -17,6 +19,16 @@ export type GuardState =
   | { status: "unauthenticated" }
   | { status: "error"; message: string }
   | { status: "ready"; account: AccountContext };
+
+// `getSession()` only reads persisted storage and compares `expires_at`; it
+// never asks the Auth server whether the session still exists. So a revoked
+// session looks healthy locally until an Edge Function rejects it.
+function isUnauthenticated(error: unknown): boolean {
+  return (
+    error instanceof ScenaApiError &&
+    (error.code === "UNAUTHENTICATED" || error.status === 401)
+  );
+}
 
 export async function resolveGuardState(): Promise<GuardState> {
   const { data } = supabase
@@ -29,6 +41,15 @@ export async function resolveGuardState(): Promise<GuardState> {
     const account = await loadAccountContext();
     return { status: "ready", account };
   } catch (error) {
+    // The stored token was accepted locally but the server says the session is
+    // gone. That is a signed-out user, not a broken account: drop the dead
+    // token and send them to /login. Falling through to /unauthorized would
+    // strand them on a page whose only control is a sign-out that also fails.
+    if (isUnauthenticated(error)) {
+      await clearLocalSession();
+      return { status: "unauthenticated" };
+    }
+
     return {
       status: "error",
       message: error instanceof Error ? error.message : "Access unavailable.",

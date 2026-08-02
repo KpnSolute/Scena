@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-08-02 — Revoked sessions no longer strand the user
+
+A stored access token can be structurally valid and unexpired while the session
+behind it no longer exists server-side (revoked elsewhere, inactivity timebox,
+rotated JWT signing key). `getSession()` only reads local storage and compares
+`expires_at`, so the client cannot see this. PostgREST still accepts the
+signature and table reads keep working, but every Edge Function authenticates
+via `auth.getUser()` and returns 401 — leaving the app half-alive.
+
+`ManagerGuard` classified that 401 as a generic account error and routed to
+`/unauthorized`, whose only control is a sign-out that fails for the same
+reason: a signed-in customer was locked out of every `/app` route with no path
+back to sign-in. An `UNAUTHENTICATED` result is now treated as signed out — the
+dead token is cleared and the user is sent to `/login`. `signOut()` falls back
+to a local-scope sign-out when the global call fails, so the stale token can
+always be dropped. Genuine backend failures still route to `/unauthorized`.
+
+Found by the live-application review; see
+`docs/review/findings/live-review-2026-08-02.md` (P0-1).
+
 ## 2026-07-31 — Session platform follow-up: FK index coverage sweep
 
 Post-merge review of the session-platform series found two real unindexed
