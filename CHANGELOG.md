@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-02 — Shared governance skills and editor-config hygiene
+
+Committed the `kpnsolute-shared` and `kpnsolute-ultra-live-application-review`
+skills for both Claude Code (`.claude/skills/`) and Codex (`.codex/skills/`).
+
+Gitignored `.cursor/` and `.vscode/`. Each editor writes its own client-specific
+MCP server definition; the committed `.mcp.json` remains the single portable
+source of truth for the Supabase MCP connection, and the per-editor files
+disagreed with it. Removed a stray robocopy error log from the repository root.
+
 ## 2026-08-02 — Revoked sessions no longer strand the user
 
 A stored access token can be structurally valid and unexpired while the session
