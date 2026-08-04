@@ -94,6 +94,7 @@ export interface BoardData {
   version: number;
   updated_at: string;
   session_started_at: string | null;
+  content_updated_at?: string;
   session_updated_at: string;
   location_timezone: string | null;
   scenes: BoardSceneData[];

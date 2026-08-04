@@ -93,7 +93,7 @@ function resolveBoardDisplayState(screenName: string, session: SessionData, sess
     display_mode: session.display_mode,
     rotation_degrees: sessionScreen.rotation_degrees,
     viewport,
-    content_version: `board:${board.id}:${board.version}:${board.updated_at}:${board.session_updated_at}`,
+    content_version: `board:${board.id}:${board.version}:${board.updated_at}:${board.content_updated_at ?? board.updated_at}:${board.session_updated_at}`,
     server_time: new Date().toISOString(),
   };
 }
@@ -126,10 +126,21 @@ async function fetchBoardSnapshot(
   if (locationError) throw ApiError.internal(locationError.message);
 
   const timezone = typeof location?.timezone === "string" && location.timezone ? location.timezone : null;
+  const sourceIds = [...new Set((elements ?? []).map((row) => jsonRecord(row.config).source_id).filter((id): id is string => typeof id === "string" && id.length > 0))];
+  const { data: sources, error: sourcesError } = sourceIds.length
+    ? await admin.from("content_sources").select("id, current_payload, updated_at").eq("workspace_id", workspaceId).eq("status", "active").in("id", sourceIds)
+    : { data: [], error: null };
+  if (sourcesError) throw ApiError.internal(sourcesError.message);
+  const sourceById = new Map((sources ?? []).map((source) => [source.id, source]));
   const elementsByScene = new Map<string, BoardElementData[]>();
   for (const row of elements ?? []) {
     const config = jsonRecord(row.config);
     if (timezone && (row.element_type === "clock" || row.element_type === "date") && !config.time_zone && !config.timeZone) config.time_zone = timezone;
+    if (row.element_type === "data_text" && typeof config.source_id === "string" && typeof config.source_key === "string") {
+      const source = sourceById.get(config.source_id);
+      const resolved = source ? resolvePath(source.current_payload, config.source_key) : undefined;
+      if (typeof resolved === "string" || typeof resolved === "number" || typeof resolved === "boolean") config.resolved_value = resolved;
+    }
     const item: BoardElementData = {
       id: row.id,
       element_type: row.element_type,
@@ -167,6 +178,7 @@ async function fetchBoardSnapshot(
     status: board.status,
     version: Number(board.version),
     updated_at: board.updated_at,
+    content_updated_at: (sources ?? []).map((source) => source.updated_at).sort().at(-1) ?? board.updated_at,
     session_started_at: sessionStartedAt,
     session_updated_at: sessionUpdatedAt,
     location_timezone: timezone,
@@ -176,6 +188,14 @@ async function fetchBoardSnapshot(
 
 function jsonRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+}
+
+function resolvePath(value: unknown, path: string): unknown {
+  return path.split(".").filter(Boolean).reduce<unknown>((current, segment) => {
+    if (Array.isArray(current) && /^\d+$/.test(segment)) return current[Number(segment)];
+    if (current && typeof current === "object") return (current as Record<string, unknown>)[segment];
+    return undefined;
+  }, value);
 }
 
 async function fetchResolvedLayout(admin: ReturnType<typeof adminClient>, orgId: string, layoutId: string): Promise<LayoutData | null> {

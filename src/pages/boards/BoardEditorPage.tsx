@@ -12,9 +12,10 @@ import {
 } from "../../components/editor/EditorShell";
 import type { EditorRailItemKey } from "../../components/editor/EditorShell";
 import {
-  ElementsGridPanel, TextPresetsPanel, UploadsPanel, PremiumUpsellPanel,
+  ElementsGridPanel, TextPresetsPanel, UploadsPanel, TemplatesPanel, BrandPanel,
 } from "../../components/editor/EditorPanels";
 import type { TextPresetSpec } from "../../components/editor/EditorPanels";
+import { applyBrandPreset, createSceneFromTemplate } from "../../components/editor/studioPresets";
 import { EditorCanvas } from "../../components/editor/EditorCanvas";
 import { PropertiesPanel } from "../../components/editor/PropertiesPanel";
 import { SceneStrip } from "../../components/editor/SceneStrip";
@@ -136,6 +137,11 @@ export function BoardEditorPage() {
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
         editor.removeElement(scene.id, element.id);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        editor.duplicateElement(scene.id, element.id);
         return;
       }
       const step = event.shiftKey ? 5 : 1;
@@ -296,8 +302,8 @@ export function BoardEditorPage() {
     activePanel === "elements" ? <ElementsGridPanel onAddElement={(type) => handleAddElement(type)} onAddShape={handleAddShape} onAddLibraryAsset={(type, config) => handleAddElement(type, undefined, config)} />
     : activePanel === "text" ? <TextPresetsPanel onInsertPreset={handleAddTextPreset} />
     : activePanel === "uploads" ? <UploadsPanel assets={assets} previewUrls={assetPreviewUrls} onInsertAsset={(assetId) => handleAddElement("asset_page", assetId)} />
-    : activePanel === "templates" ? <PremiumUpsellPanel feature="templates" />
-    : activePanel === "brand" ? <PremiumUpsellPanel feature="brand" />
+    : activePanel === "templates" ? <TemplatesPanel onApply={(templateId) => editor.addScene(createSceneFromTemplate(templateId, snapshot.scenes.length))} />
+    : activePanel === "brand" ? <BrandPanel onApply={(brand) => scene && editor.updateScene(scene.id, applyBrandPreset(scene, brand))} />
     : null;
 
   return (
@@ -348,6 +354,7 @@ export function BoardEditorPage() {
           element={editor.selectedElement}
           onChange={(patch) => scene && editor.selectedElementId && editor.updateElement(scene.id, editor.selectedElementId, patch)}
           onDelete={() => scene && editor.selectedElementId && editor.removeElement(scene.id, editor.selectedElementId)}
+          onDuplicate={() => scene && editor.selectedElementId && editor.duplicateElement(scene.id, editor.selectedElementId)}
           onLayerMove={(direction) => {
             if (!scene || !editor.selectedElement) return;
             const delta = direction === "up" ? 1 : -1;
@@ -364,6 +371,8 @@ export function BoardEditorPage() {
         onAddScene={handleAddScene}
         onReorder={editor.reorderScenes}
         onUpdateScene={(sceneId, patch) => editor.updateScene(sceneId, patch)}
+        onDuplicate={editor.duplicateScene}
+        onDelete={editor.removeScene}
       />
       )}
 

@@ -1,5 +1,85 @@
 # Changelog
 
+## 2026-08-04 — KpnSolute CloudEvents Connection adapter
+
+Extended Connected Content with a first-class KpnCompute menu connection.
+Scena can register, rotate, and archive a tenant-scoped subscription through
+KpnSolute Events; webhook signing secrets are encrypted before persistence.
+The receiver verifies Standard Webhooks signatures and CloudEvents tenant/type
+fields before atomically committing normalized menu sections for board binding.
+Legacy bearer-token Connections remain compatible.
+
+Verification: the shared crypto test passed, the Edge Function passed Deno
+check, TypeScript passed, 180 tests passed, and the production build completed
+with the existing large-chunk warning. The migration, function, gateway
+credentials, and live subscription remain undeployed.
+
+## 2026-08-04 — Menu-board-first Elements browser
+
+Reworked the Board editor’s Elements drawer around customer jobs instead of
+database primitives. “Static” and “Live” are replaced by Content, Shapes &
+accents, Display widgets, and Connections. Every element now explains what it
+does and shows whether it is ready or still needs setup, so webhook/API-backed
+Connected text, weather, video, and music are not presented as functioning live
+sources.
+
+Added search across content and widgets plus menu-board quick inserts for a
+menu title, section heading, menu item, price, and service notice. These use the
+existing persisted text-element contract and remain editable through the normal
+properties panel. Updated the unauthenticated editor preview so those quick
+inserts can be exercised without changing production data.
+
+Verification: `npx.cmd tsc -b` passed; 174 tests passed; production build
+completed with the existing large-chunk warning; headless Chrome verified the
+categories, menu-title insertion, search filtering, setup label, and zero
+browser console errors on `/dev/editor`. No commit, push, deployment, database,
+or live-site change was made.
+
+Expanded this same update into the complete menu-board Studio authoring scope.
+Scenes can now be selected by keyboard, renamed, reordered, duplicated,
+hidden/shown, and deleted; Elements can be duplicated from the properties panel
+or with Ctrl/Cmd+D. Templates now insert complete persisted cafe menu scenes,
+and Brand applies coordinated palette and typography presets instead of showing
+an upsell placeholder.
+
+Added Connected Content as a source-complete feature: a Connections manager
+page, one-time rotatable webhook credentials, an authenticated and idempotent
+`menu.updated` envelope, RLS-protected source/event tables, atomic event commit,
+Connection ID and dot-path binding for Connected text, and display-gateway
+resolution that changes the kiosk content version when source data changes.
+The migration and `content-source` Edge Function are source-only until an
+approved production deployment; no live webhook credential exists yet.
+
+Final verification: 180 tests passed; TypeScript and both changed Edge
+Functions passed type checking; production build completed with the existing
+large-chunk warning; headless Chrome exercised Elements, Templates, Brand,
+scene duplication and scene visibility with zero console errors.
+
+## 2026-08-02 — Plan availability, legal pages, and a corrected plan table
+
+Three launch blockers from the live-application review, all of them the same
+class of defect: the site stated something the product could not honour.
+
+`/docs` listed Basic automation for Plus while `plan_entitlements.plus.
+automation_tier` is `none`, so a Plus customer buying for scheduling would have
+been rejected at write time by `enforce_automation_entitlement`. The plan table
+now matches the database and carries a comment saying it must.
+
+Pricing now records each plan's `availability` alongside its limits, mirroring
+`plan_entitlements`. Max is `unavailable` — its Groups, resource access control
+and template schema exist but are not reachable from the manager UI — so its
+purchase control is disabled and labelled rather than presented as an ordinary
+sale. Plus and Pro are `limited` and now say so, per SOP §3.1.
+
+Terms of Service and Privacy Policy existed only as footer links pointing back
+at the homepage. Both are now real pages at `/terms` and `/privacy`, describing
+what Scena actually collects, what it deliberately does not collect (no audience
+measurement, no sensing on Displays), and who processes it. Clauses requiring a
+commercial or jurisdictional decision are listed in `LEGAL_REVIEW_REQUIRED` and
+must be settled before live payments are enabled.
+
+See `docs/review/findings/live-review-2026-08-02.md` (P0-2, P0-4, P0-5).
+
 ## 2026-08-02 — Shared governance skills and editor-config hygiene
 
 Committed the `kpnsolute-shared` and `kpnsolute-ultra-live-application-review`

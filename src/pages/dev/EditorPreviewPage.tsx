@@ -10,9 +10,10 @@ import {
 } from "../../components/editor/EditorShell";
 import type { EditorRailItemKey } from "../../components/editor/EditorShell";
 import {
-  ElementsGridPanel, TextPresetsPanel, UploadsPanel, PremiumUpsellPanel,
+  ElementsGridPanel, TextPresetsPanel, UploadsPanel, TemplatesPanel, BrandPanel,
 } from "../../components/editor/EditorPanels";
 import type { TextPresetSpec } from "../../components/editor/EditorPanels";
+import { applyBrandPreset, createSceneFromTemplate } from "../../components/editor/studioPresets";
 import { EditorCanvas } from "../../components/editor/EditorCanvas";
 import { PropertiesPanel } from "../../components/editor/PropertiesPanel";
 import { SceneStrip } from "../../components/editor/SceneStrip";
@@ -211,6 +212,40 @@ export function EditorPreviewPage() {
     }));
   }
 
+  function updateScene(sceneId: string, patch: Partial<BoardScene>) {
+    mutate((draft) => draft.map((item) => item.id === sceneId ? { ...item, ...patch } : item));
+  }
+
+  function duplicateScene(sceneId: string) {
+    const source = scenes.find((item) => item.id === sceneId);
+    if (!source) return;
+    const copy = { ...source, id: crypto.randomUUID(), name: `${source.name} copy`, elements: source.elements.map((element) => ({ ...element, id: crypto.randomUUID(), config: { ...element.config } })) };
+    mutate((draft) => [...draft, copy]);
+    setSelectedSceneId(copy.id);
+  }
+
+  function deleteScene(sceneId: string) {
+    if (scenes.length <= 1) return;
+    const remaining = scenes.filter((item) => item.id !== sceneId);
+    mutate(() => remaining);
+    setSelectedSceneId(remaining[0].id);
+    setSelectedElementId(null);
+  }
+
+  function addLibraryAsset(type: "image" | "text", config: Record<string, unknown>) {
+    const size = DEFAULT_SIZE[type];
+    insertElement(demoElement({
+      id: crypto.randomUUID(),
+      element_type: type,
+      x: 50 - size.width / 2,
+      y: 50 - size.height / 2,
+      width: size.width,
+      height: size.height,
+      z_index: scene.elements.length,
+      config,
+    }));
+  }
+
   function addScene() {
     const newScene: BoardScene = {
       id: crypto.randomUUID(),
@@ -247,12 +282,12 @@ export function EditorPreviewPage() {
   }
 
   const panelContent =
-    activePanel === "elements" ? <ElementsGridPanel onAddElement={addElement} onAddShape={addShape} />
+    activePanel === "elements" ? <ElementsGridPanel onAddElement={addElement} onAddShape={addShape} onAddLibraryAsset={addLibraryAsset} />
     : activePanel === "text" ? <TextPresetsPanel onInsertPreset={addTextPreset} />
     // Preview never fetches: Uploads shows its empty state.
     : activePanel === "uploads" ? <UploadsPanel assets={[]} onInsertAsset={() => {}} />
-    : activePanel === "templates" ? <PremiumUpsellPanel feature="templates" />
-    : activePanel === "brand" ? <PremiumUpsellPanel feature="brand" />
+    : activePanel === "templates" ? <TemplatesPanel onApply={(templateId) => { const next = createSceneFromTemplate(templateId, scenes.length); mutate((draft) => [...draft, next]); setSelectedSceneId(next.id); }} />
+    : activePanel === "brand" ? <BrandPanel onApply={(brand) => mutate((draft) => draft.map((item) => item.id === scene.id ? { ...item, ...applyBrandPreset(item, brand) } : item))} />
     : null;
 
   return (
@@ -294,6 +329,7 @@ export function EditorPreviewPage() {
           element={selectedElement}
           onChange={(patch) => selectedElementId && updateElement(scene.id, selectedElementId, patch)}
           onDelete={() => selectedElementId && removeElement(scene.id, selectedElementId)}
+          onDuplicate={() => selectedElement && insertElement({ ...selectedElement, id: crypto.randomUUID(), x: selectedElement.x + 2, y: selectedElement.y + 2, config: { ...selectedElement.config } })}
           onLayerMove={(direction) => {
             if (!selectedElement) return;
             const delta = direction === "up" ? 1 : -1;
@@ -309,6 +345,9 @@ export function EditorPreviewPage() {
           onSelect={(sceneId) => { setSelectedSceneId(sceneId); setSelectedElementId(null); }}
           onAddScene={addScene}
           onReorder={reorderScenes}
+          onUpdateScene={updateScene}
+          onDuplicate={duplicateScene}
+          onDelete={deleteScene}
         />
       )}
 

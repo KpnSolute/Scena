@@ -101,6 +101,7 @@
 .scena-price-card ul { list-style: none; margin: var(--scena-space-4) 0; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .scena-price-card li { font-size: var(--scena-text-sm); color: var(--scena-text-secondary); display: flex; gap: 8px; align-items: flex-start; }
 .scena-price-card li svg { flex-shrink: 0; margin-top: 3px; color: var(--scena-success); }
+.scena-price-card__availability { font-size: var(--scena-text-xs); color: var(--scena-text-muted); margin-bottom: var(--scena-space-3); line-height: 1.5; }
 
 .scena-final-cta {
   max-width: 1100px; margin: 0 auto var(--scena-space-24); padding: var(--scena-space-16) var(--scena-space-8); text-align: center;

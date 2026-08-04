@@ -412,20 +412,24 @@ export function readMusicPlayerConfig(element: { config: Record<string, unknown>
 }
 
 export interface DataTextConfig extends TextStyleConfig, ElementBorderConfig {
+  source_id: string;
   /** Dot-path into a future live-data payload, e.g. "store.queue_length". */
   source_key: string;
   prefix: string;
   suffix: string;
   fallback: string;
+  resolved_value: string | number | boolean | null;
 }
 export function readDataTextConfig(element: { config: Record<string, unknown> | null | undefined }): DataTextConfig {
   const c = cfg(element);
   return {
     ...readTextStyle(element),
     ...readBorderConfig(element),
+    source_id: typeof c.source_id === "string" ? c.source_id : "",
     source_key: typeof c.source_key === "string" ? c.source_key : typeof c.key === "string" ? c.key : "",
     prefix: typeof c.prefix === "string" ? c.prefix : "",
     suffix: typeof c.suffix === "string" ? c.suffix : "",
+    resolved_value: typeof c.resolved_value === "string" || typeof c.resolved_value === "number" || typeof c.resolved_value === "boolean" ? c.resolved_value : null,
     fallback: typeof c.fallback === "string" ? c.fallback : "—",
   };
 }

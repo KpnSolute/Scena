@@ -1,4 +1,22 @@
 # AGENTS.md — Scena Project Facts & Governance
+
+<!-- KPNSOLUTE-SHARED-MEMORY: BEGIN -->
+## Shared KpnSolute operating memory
+
+Before material work, read the canonical cross-project ledger:
+
+`C:\Projects\_config\kpnsolute-governance\SHARED_MEMORY.md`
+
+After material work, append a dated contribution using the governance append
+helper. Keep local `AGENTS.md`, `CLAUDE.md`, and `CHANGELOG.md` rules in force;
+shared memory records cross-project operational state and never stores secrets.
+Do not infer committed, pushed, deployed, or live-verified state from another
+status. Use exact finding identifiers; use `Studio Phase A/B/C` for product
+phases. Structural or multi-file governance edits require explicit roster
+approval. Do not commit or push without an approved repository-specific
+identifier.
+<!-- KPNSOLUTE-SHARED-MEMORY: END -->
+
 **Single Source of Truth for Scena Manager Portal & Kiosk Display**
 
 > [!IMPORTANT]

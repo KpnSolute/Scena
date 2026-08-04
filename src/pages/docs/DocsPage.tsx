@@ -46,9 +46,14 @@ const PLAYERS: Player[] = [
   },
 ];
 
+// Must match public.plan_entitlements exactly. A number or capability stated
+// here that the database does not grant is a promise the product will reject
+// at write time — `enforce_automation_entitlement` refuses an automation the
+// plan's `automation_tier` does not cover, whatever this table says.
 const PLAN_ROWS = [
   { name: "Personal Free", price: "$0 forever", workspace: "Personal", displays: "2", boards: "5", members: "1", automation: "—" },
-  { name: "Plus", price: "$15 / month", workspace: "Team", displays: "2", boards: "10", members: "5", automation: "Basic" },
+  // plan_entitlements.plus.automation_tier is 'none', not 'basic'.
+  { name: "Plus", price: "$15 / month", workspace: "Team", displays: "2", boards: "10", members: "5", automation: "—" },
   { name: "Pro", price: "$25 / month", workspace: "Team", displays: "5", boards: "30", members: "10", automation: "Basic" },
   { name: "Max", price: "$40 / month", workspace: "Team", displays: "15", boards: "50", members: "25", automation: "Advanced" },
 ];

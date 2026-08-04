@@ -159,7 +159,7 @@ function normalizedTimeZone(config: ElementConfig): string | undefined {
 }
 
 function DataTextBody({ config }: { config: ElementConfig }) {
-  const value = config.value ?? config.text ?? config.content ?? config.data;
+  const value = config.resolved_value ?? config.value ?? config.text ?? config.content ?? config.data;
   return <span className="scena-editor__renderer-data-text">{value === undefined || value === null || value === "" ? "No data connected" : String(value)}</span>;
 }
 

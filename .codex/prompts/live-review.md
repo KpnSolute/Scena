@@ -66,3 +66,12 @@ loses the session and turns a manager-route review into a login-redirect review.
 Write findings to `docs/review/findings/live-review-<YYYY-MM-DD>.md` and
 summarise the verdict plus all P0/P1 items in your final message. Do not bury a
 P0 in a file.
++
+## Cross-agent memory protocol
+
+Before material work, read `C:\Projects\_config\kpnsolute-governance\SHARED_MEMORY.md`.
+After material work, append a dated contribution with task/finding, files, local
+verification, GitHub state, deployment state, live verification, and remaining
+work. Keep project-local rules and CHANGELOG duties intact; never store secrets.
+Use exact P0 finding identifiers and `Studio Phase A/B/C` for product phases.
+Do not commit or push without an approved repository-specific identifier.

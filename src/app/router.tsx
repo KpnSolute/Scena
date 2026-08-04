@@ -26,6 +26,7 @@ import { SessionDetailPage } from "../pages/sessions/SessionDetailPage";
 import { LayoutsPage } from "../pages/layouts/LayoutsPage";
 import { LayoutDetailPage } from "../pages/layouts/LayoutDetailPage";
 import { AutomationsPage } from "../pages/automations/AutomationsPage";
+import { ConnectionsPage } from "../pages/connections/ConnectionsPage";
 import { MembersPage } from "../pages/members/MembersPage";
 import { BillingPage } from "../pages/billing/BillingPage";
 import { PlanSettingsPage } from "../pages/settings/PlanSettingsPage";
@@ -46,6 +47,8 @@ function placeholder(path: string) {
 // Board editor (the heaviest single screen — canvas/drag/resize code), and
 // the internal-only dev showcase (never needed in the real product at all).
 const LandingPageLazy = () => lazyRoute(() => import("../pages/landing/LandingPage").then((m) => ({ default: m.LandingPage })));
+const TermsPageLazy = () => lazyRoute(() => import("../pages/legal/LegalPage").then((m) => ({ default: m.TermsPage })));
+const PrivacyPageLazy = () => lazyRoute(() => import("../pages/legal/LegalPage").then((m) => ({ default: m.PrivacyPage })));
 const DocsPageLazy = () => lazyRoute(() => import("../pages/docs/DocsPage").then((m) => ({ default: m.DocsPage })));
 const CommunityPageLazy = () => lazyRoute(() => import("../pages/community/CommunityPage").then((m) => ({ default: m.CommunityPage })));
 const BoardEditorPageLazy = () => lazyRoute(() => import("../pages/boards/BoardEditorPage").then((m) => ({ default: m.BoardEditorPage })));
@@ -59,6 +62,8 @@ export const routeTree: RouteObject[] = [
   { path: "/", element: LandingPageLazy() },
   { path: "/docs", element: DocsPageLazy() },
   { path: "/community", element: CommunityPageLazy() },
+  { path: "/terms", element: TermsPageLazy() },
+  { path: "/privacy", element: PrivacyPageLazy() },
   { path: "/login", element: <LoginPage /> },
   { path: "/auth/callback", element: <CallbackPage /> },
   { path: "/unauthorized", element: <UnauthorizedPage /> },
@@ -90,6 +95,7 @@ export const routeTree: RouteObject[] = [
           { path: "layouts", element: <LayoutsPage /> },
           { path: "layouts/:layoutId", element: <LayoutDetailPage /> },
           { path: "automations", element: <AutomationsPage /> },
+          { path: "connections", element: <ConnectionsPage /> },
           { path: "members", element: <MembersPage /> },
           { path: "billing", element: <BillingPage /> },
           { path: "settings", element: <SettingsIndexPage /> },

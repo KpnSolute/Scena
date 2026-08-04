@@ -43,13 +43,25 @@ const STEPS = [
   { title: "Pair a Display", desc: "Enter the six-digit pairing code shown on the screen to connect it to your Workspace." },
 ];
 
+// `availability` mirrors public.plan_entitlements.availability, which SOP §6
+// treats as data rather than convention. A plan that is not
+// `generally_available` must not be presented as an ordinary purchase: SOP §3.1
+// forbids selling an unavailable capability without a written limitation.
 const PRICING = [
-  { code: "personal_free", name: "Personal Free", price: "$0", cadence: "forever", features: ["1 Personal Workspace", "2 Displays", "5 Boards", "5 source uploads / month", "1 member"] },
-  { code: "personal_additional", name: "Additional Personal", price: "$15", cadence: "one-time", features: ["One more Personal Workspace", "Same Personal Free limits", "No recurring charge"] },
-  { code: "plus", name: "Plus", price: "$15", cadence: "/month", features: ["Team Workspace", "2 Displays", "10 Boards", "5 members", "1 concurrent Session"], featured: true },
-  { code: "pro", name: "Pro", price: "$25", cadence: "/month", features: ["Team Workspace", "5 Displays", "30 Boards", "10 members", "Basic automation"] },
-  { code: "max", name: "Max", price: "$40", cadence: "/month", features: ["Team Workspace", "15 Displays", "50 Boards", "25 members", "Advanced automation, groups"] },
+  { code: "personal_free", name: "Personal Free", price: "$0", cadence: "forever", availability: "generally_available", features: ["1 Personal Workspace", "2 Displays", "5 Boards", "5 source uploads / month", "1 member"] },
+  { code: "personal_additional", name: "Additional Personal", price: "$15", cadence: "one-time", availability: "generally_available", features: ["One more Personal Workspace", "Same Personal Free limits", "No recurring charge"] },
+  { code: "plus", name: "Plus", price: "$15", cadence: "/month", availability: "limited", features: ["Team Workspace", "2 Displays", "10 Boards", "5 members", "1 concurrent Session"], featured: true },
+  { code: "pro", name: "Pro", price: "$25", cadence: "/month", availability: "limited", features: ["Team Workspace", "5 Displays", "30 Boards", "10 members", "Basic automation"] },
+  // Max stays unavailable until Display Groups, Session Groups, resource access
+  // control and templates are reachable from the manager UI. Working schema is
+  // not a shipped product (SOP §6).
+  { code: "max", name: "Max", price: "$40", cadence: "/month", availability: "unavailable", features: ["Team Workspace", "15 Displays", "50 Boards", "25 members", "Advanced automation, groups"] },
 ];
+
+const AVAILABILITY_NOTE: Record<string, string> = {
+  limited: "Limited availability — onboarding is reviewed before your Workspace is provisioned.",
+  unavailable: "Not yet available. Groups and advanced automation are still in development.",
+};
 
 const FAQ = [
   { key: "what", question: "What is Scena?", answer: "Scena is a digital signage platform for building Boards and playing them on paired Displays, backed by real Workspace, Asset, and Board APIs." },
@@ -175,11 +187,20 @@ export function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/login">
-                <Button variant={plan.featured ? "primary" : "secondary"} block>
-                  {plan.code === "personal_free" ? "Start free" : "Choose plan"}
+              {AVAILABILITY_NOTE[plan.availability] ? (
+                <p className="scena-price-card__availability">{AVAILABILITY_NOTE[plan.availability]}</p>
+              ) : null}
+              {plan.availability === "unavailable" ? (
+                <Button variant="secondary" block disabled>
+                  Coming later
                 </Button>
-              </Link>
+              ) : (
+                <Link to="/login">
+                  <Button variant={plan.featured ? "primary" : "secondary"} block>
+                    {plan.code === "personal_free" ? "Start free" : "Choose plan"}
+                  </Button>
+                </Link>
+              )}
             </div>
           ))}
         </div>
@@ -237,8 +258,8 @@ export function LandingPage() {
           <div className="scena-footer__col">
             <h4>Legal</h4>
             <ul>
-              <li><a href="https://scena.kpnsolute.com">Terms of Service</a></li>
-              <li><a href="https://scena.kpnsolute.com">Privacy Policy</a></li>
+              <li><Link to="/terms">Terms of Service</Link></li>
+              <li><Link to="/privacy">Privacy Policy</Link></li>
             </ul>
           </div>
         </div>

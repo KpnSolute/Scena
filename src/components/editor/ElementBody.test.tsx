@@ -59,4 +59,10 @@ describe("ElementBody renderers", () => {
     expect(screen.getByText("Add a QR destination")).toBeInTheDocument();
     expect(screen.queryByText("qr static")).not.toBeInTheDocument();
   });
+
+  it("renders resolved connected text without a preview-only badge", () => {
+    render(<ElementBody element={element("data_text", { source_id: "source-1", source_key: "menu.title", resolved_value: "Lunch Menu" })} />);
+    expect(screen.getByText("Lunch Menu")).toBeInTheDocument();
+    expect(screen.queryByText(/preview/i)).not.toBeInTheDocument();
+  });
 });

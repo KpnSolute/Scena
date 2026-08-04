@@ -172,9 +172,56 @@ export function useBoardEditor(boardId: string, workspaceId: string) {
     setSelectedElementId(null);
   }
 
+  function duplicateElement(sceneId: string, elementId: string) {
+    const scene = snapshot?.scenes.find((item) => item.id === sceneId);
+    const source = scene?.elements.find((element) => element.id === elementId);
+    if (!source || !scene) return;
+    addElement(sceneId, {
+      ...source,
+      id: crypto.randomUUID(),
+      name: source.name ? `${source.name} copy` : null,
+      x: Math.min(100 - source.width, source.x + 2),
+      y: Math.min(100 - source.height, source.y + 2),
+      z_index: Math.max(...scene.elements.map((element) => element.z_index), 0) + 1,
+      config: { ...source.config },
+    });
+  }
+
   function addScene(scene: BoardScene) {
     mutate((draft) => ({ ...draft, scenes: [...draft.scenes, scene] }));
     setSelectedSceneId(scene.id);
+  }
+
+  function duplicateScene(sceneId: string) {
+    const source = snapshot?.scenes.find((scene) => scene.id === sceneId);
+    if (!source) return;
+    const copy: BoardScene = {
+      ...source,
+      id: crypto.randomUUID(),
+      name: `${source.name} copy`,
+      background: { ...source.background },
+      transition_config: { ...source.transition_config },
+      elements: source.elements.map((element) => ({ ...element, id: crypto.randomUUID(), config: { ...element.config } })),
+    };
+    mutate((draft) => {
+      const index = draft.scenes.findIndex((scene) => scene.id === sceneId);
+      const scenes = [...draft.scenes.slice(0, index + 1), copy, ...draft.scenes.slice(index + 1)];
+      return { ...draft, scenes: scenes.map((scene, order) => ({ ...scene, sort_order: order })) };
+    });
+    setSelectedSceneId(copy.id);
+    setSelectedElementId(null);
+  }
+
+  function removeScene(sceneId: string) {
+    if (!snapshot || snapshot.scenes.length <= 1) return;
+    const index = snapshot.scenes.findIndex((scene) => scene.id === sceneId);
+    const nextSelected = snapshot.scenes[index + 1]?.id ?? snapshot.scenes[index - 1]?.id ?? null;
+    mutate((draft) => ({
+      ...draft,
+      scenes: draft.scenes.filter((scene) => scene.id !== sceneId).map((scene, order) => ({ ...scene, sort_order: order })),
+    }));
+    setSelectedSceneId(nextSelected);
+    setSelectedElementId(null);
   }
 
   function reorderScenes(sceneId: string, direction: "left" | "right") {
@@ -226,7 +273,10 @@ export function useBoardEditor(boardId: string, workspaceId: string) {
     updateElement,
     addElement,
     removeElement,
+    duplicateElement,
     addScene,
+    duplicateScene,
+    removeScene,
     reorderScenes,
     loadRevisions,
     createRevision,

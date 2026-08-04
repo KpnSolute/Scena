@@ -107,8 +107,8 @@ const RAIL_ITEMS: { key: EditorRailItemKey; label: string; icon: ReactNode; prem
   { key: "elements", label: "Elements", icon: <SquaresFour size={22} /> },
   { key: "text", label: "Text", icon: <TextT size={22} /> },
   { key: "uploads", label: "Uploads", icon: <UploadSimple size={22} /> },
-  { key: "templates", label: "Templates", icon: <Layout size={22} />, premium: true },
-  { key: "brand", label: "Brand", icon: <PaintBrushBroad size={22} />, premium: true },
+  { key: "templates", label: "Templates", icon: <Layout size={22} /> },
+  { key: "brand", label: "Brand", icon: <PaintBrushBroad size={22} /> },
 ];
 
 const RAIL_LABELS: Record<EditorRailItemKey, string> = {

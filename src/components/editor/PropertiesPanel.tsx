@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Eye, EyeSlash, LockSimple, LockSimpleOpen, ArrowUp, ArrowDown, Trash } from "@phosphor-icons/react";
+import { Eye, EyeSlash, LockSimple, LockSimpleOpen, ArrowUp, ArrowDown, Trash, Copy } from "@phosphor-icons/react";
 import type { SceneElement, BorderStyle } from "../../services/scena-api/boards";
 import { readBorderConfig, readShapeConfig, readTextStyle } from "../../services/scena-api/boards";
 import { Field } from "../ui/Field";
@@ -58,10 +58,11 @@ export interface PropertiesPanelProps {
   element: SceneElement | null;
   onChange: (patch: Partial<SceneElement>) => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
   onLayerMove: (direction: "up" | "down") => void;
 }
 
-export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: PropertiesPanelProps) {
+export function PropertiesPanel({ element, onChange, onDelete, onDuplicate, onLayerMove }: PropertiesPanelProps) {
   if (!element) {
     return (
       <div className="scena-editor__properties">
@@ -110,6 +111,7 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
             size="sm"
             onClick={() => onChange({ is_locked: !element.is_locked })}
           />
+          {onDuplicate && <IconButton icon={<Copy size={16} />} label="Duplicate element" size="sm" onClick={onDuplicate} />}
           <IconButton icon={<Trash size={16} />} label="Delete element" size="sm" onClick={onDelete} />
         </div>
       </div>
@@ -257,8 +259,9 @@ export function PropertiesPanel({ element, onChange, onDelete, onLayerMove }: Pr
       )}
 
       {element.element_type === "data_text" && (
-        <ConfigGroup title="Live data text">
-          <Field label="Data key" hint="A key supplied by a future display data context, not a network endpoint."><Input value={String(config.source_key)} onChange={(event) => updateConfig({ source_key: event.target.value })} /></Field>
+        <ConfigGroup title="Connected text">
+          <Field label="Connection ID" hint="Create and copy this from the Connections page."><Input value={String(config.source_id ?? "")} onChange={(event) => updateConfig({ source_id: event.target.value })} /></Field>
+          <Field label="Data path" hint="Dot path such as menu.sections.0.items.0.name."><Input value={String(config.source_key)} onChange={(event) => updateConfig({ source_key: event.target.value })} /></Field>
           <Field label="Fallback text"><Input value={String(config.fallback)} onChange={(event) => updateConfig({ fallback: event.target.value })} /></Field>
           <div className="scena-editor__prop-row"><Field label="Prefix"><Input value={String(config.prefix)} onChange={(event) => updateConfig({ prefix: event.target.value })} /></Field><Field label="Suffix"><Input value={String(config.suffix)} onChange={(event) => updateConfig({ suffix: event.target.value })} /></Field></div>
         </ConfigGroup>

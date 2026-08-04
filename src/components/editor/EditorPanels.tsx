@@ -14,6 +14,7 @@ import type { ElementType, ShapeVariant } from "../../services/scena-api/boards"
 import { Skeleton } from "../ui/Skeleton";
 import { EmptyState } from "../ui/EmptyState";
 import { SHAPE_VARIANTS, SHAPE_VARIANT_ICONS, SHAPE_VARIANT_LABELS } from "./shapeVariants";
+import { BRAND_PRESETS, STUDIO_TEMPLATES, type BrandPreset, type StudioTemplateId } from "./studioPresets";
 
 /* ------------------------------------------------------------------ */
 /* Elements                                                           */
@@ -41,19 +42,55 @@ const ELEMENT_LABELS: Record<ElementType, string> = {
   text: "Text",
   image: "Image",
   shape: "Shape",
-  asset_page: "Asset page",
-  qr_static: "QR (static)",
-  qr_dynamic: "QR (dynamic)",
+  asset_page: "Asset",
+  qr_static: "QR code",
+  qr_dynamic: "Connected QR",
   clock: "Clock",
   date: "Date",
   countdown: "Countdown",
   ticker: "Ticker",
-  music_player: "Music player",
-  carousel: "Carousel",
-  video: "Video",
+  music_player: "Music preview",
+  carousel: "Asset rotation",
+  video: "Video preview",
   weather: "Weather",
-  data_text: "Live data text",
+  data_text: "Connected text",
 };
+
+const ELEMENT_DESCRIPTIONS: Record<ElementType, string> = {
+  text: "Headings, menu items, prices, and notes",
+  image: "Place an image or local graphic",
+  shape: "Backgrounds, dividers, and accents",
+  asset_page: "A ready image, PDF page, or PowerPoint slide",
+  qr_static: "Link guests to a menu, order page, or survey",
+  qr_dynamic: "A redirect target you can change later",
+  clock: "Current time for this display",
+  date: "Current date for this display",
+  countdown: "Count down to an event or service change",
+  ticker: "A scrolling announcement",
+  music_player: "Designed player state; playback is not connected",
+  carousel: "Rotate through ready workspace Assets",
+  video: "Designed video state; playback is not connected",
+  weather: "Designed weather state; a source is not connected",
+  data_text: "A future value from an API or webhook field",
+};
+
+const READY_WIDGETS: readonly ElementType[] = ["clock", "date", "countdown", "ticker", "carousel", "qr_dynamic"];
+const CONNECTION_PREVIEWS: readonly ElementType[] = ["data_text", "weather", "video", "music_player"];
+
+interface MenuStarter {
+  id: string;
+  label: string;
+  description: string;
+  config: Record<string, unknown>;
+}
+
+const MENU_STARTERS: readonly MenuStarter[] = [
+  { id: "menu-title", label: "Menu title", description: "Large display heading", config: { text: "Today’s Menu", font_size: 72, font_weight: 800, font_family: "display", align: "center" } },
+  { id: "section-heading", label: "Section heading", description: "Breakfast, lunch, drinks…", config: { text: "Lunch", font_size: 44, font_weight: 700, font_family: "display" } },
+  { id: "menu-item", label: "Menu item", description: "Dish name and description", config: { text: "Menu item\nShort description", font_size: 30, font_weight: 600, line_height: 1.35 } },
+  { id: "price", label: "Price", description: "Clear right-aligned price", config: { text: "$0.00", font_size: 34, font_weight: 700, align: "right" } },
+  { id: "notice", label: "Service notice", description: "Special, sold out, or closing note", config: { text: "Today’s special", font_size: 28, font_weight: 700, align: "center", background: "#5b7cfa" } },
+];
 
 export interface ElementsGridPanelProps {
   onAddElement: (type: ElementType) => void;
@@ -64,46 +101,89 @@ export interface ElementsGridPanelProps {
 }
 
 export function ElementsGridPanel({ onAddElement, onAddShape, onAddLibraryAsset = () => {} }: ElementsGridPanelProps) {
-  // "shape" gets its own sub-palette below instead of a single generic tile.
+  const [query, setQuery] = useState("");
+  const normalized = query.trim().toLowerCase();
+  const matches = (label: string, description = "") => !normalized || `${label} ${description}`.toLowerCase().includes(normalized);
+  const menuStarters = MENU_STARTERS.filter((item) => matches(item.label, item.description));
   const staticTypes = SCENA_UI_API_CAPABILITIES.elements.static.filter((type) => type !== "shape");
-  return (
-    <div>
-      <h4 className="scena-editor__drawer-section-title">Static</h4>
-      <div className="scena-editor__element-grid">
-        {staticTypes.map((type) => (
-          <button key={type} type="button" className="scena-editor__element-tile" onClick={() => onAddElement(type)}>
-            {ELEMENT_ICONS[type]}
-            <span>{ELEMENT_LABELS[type]}</span>
-          </button>
-        ))}
-      </div>
+  const contentTypes = staticTypes.filter((type) => matches(ELEMENT_LABELS[type], ELEMENT_DESCRIPTIONS[type]));
+  const readyWidgets = READY_WIDGETS.filter((type) => matches(ELEMENT_LABELS[type], ELEMENT_DESCRIPTIONS[type]));
+  const connectionPreviews = CONNECTION_PREVIEWS.filter((type) => matches(ELEMENT_LABELS[type], ELEMENT_DESCRIPTIONS[type]));
+  const shapeVariants = SHAPE_VARIANTS.filter((variant) => matches(SHAPE_VARIANT_LABELS[variant], "shape accent divider background"));
+  const hasResults = menuStarters.length + contentTypes.length + readyWidgets.length + connectionPreviews.length + shapeVariants.length > 0;
 
-      <h4 className="scena-editor__drawer-section-title" style={{ marginTop: 16 }}>Shapes</h4>
+  function renderElementTile(type: ElementType, availability: "ready" | "setup" = "ready") {
+    return (
+      <button key={type} type="button" className="scena-editor__element-tile" onClick={() => onAddElement(type)}>
+        <span className="scena-editor__element-tile-icon">{ELEMENT_ICONS[type]}</span>
+        <span className="scena-editor__element-tile-copy">
+          <strong>{ELEMENT_LABELS[type]}</strong>
+          <small>{ELEMENT_DESCRIPTIONS[type]}</small>
+        </span>
+        <span className={`scena-editor__element-status scena-editor__element-status--${availability}`}>
+          {availability === "ready" ? "Ready" : "Setup"}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="scena-editor__elements-browser">
+      <label className="scena-editor__element-search">
+        <MagnifyingGlass size={17} aria-hidden="true" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search content and widgets" aria-label="Search content and widgets" />
+      </label>
+
+      {menuStarters.length > 0 && <section className="scena-editor__element-section">
+        <div className="scena-editor__element-section-heading">
+          <div><h4>Menu board starters</h4><p>Insert styled content, then replace the sample text.</p></div>
+          <span>Recommended</span>
+        </div>
+        <div className="scena-editor__menu-starters">
+          {menuStarters.map((item) => (
+            <button key={item.id} type="button" className="scena-editor__menu-starter" onClick={() => onAddLibraryAsset("text", item.config)}>
+              <TextT size={18} aria-hidden="true" />
+              <span><strong>{item.label}</strong><small>{item.description}</small></span>
+            </button>
+          ))}
+        </div>
+      </section>}
+
+      {contentTypes.length > 0 && <section className="scena-editor__element-section">
+        <div className="scena-editor__element-section-heading"><div><h4>Content</h4><p>Things guests will read, scan, or see.</p></div></div>
+        <div className="scena-editor__element-grid">{contentTypes.map((type) => renderElementTile(type))}</div>
+      </section>}
+
+      {shapeVariants.length > 0 && <section className="scena-editor__element-section">
+      <div className="scena-editor__element-section-heading"><div><h4>Shapes & accents</h4><p>Structure sections and add visual hierarchy.</p></div></div>
       <div className="scena-editor__element-grid" role="group" aria-label="Insert a shape">
-        {SHAPE_VARIANTS.map((variant) => (
+        {shapeVariants.map((variant) => (
           <button
             key={variant}
             type="button"
-            className="scena-editor__element-tile"
+            className="scena-editor__element-tile scena-editor__element-tile--shape"
             onClick={() => onAddShape(variant)}
           >
-            {SHAPE_VARIANT_ICONS[variant]}
-            <span>{SHAPE_VARIANT_LABELS[variant]}</span>
+            <span className="scena-editor__element-tile-icon">{SHAPE_VARIANT_ICONS[variant]}</span>
+            <span className="scena-editor__element-tile-copy"><strong>{SHAPE_VARIANT_LABELS[variant]}</strong><small>Design accent</small></span>
           </button>
         ))}
       </div>
+      </section>}
 
-      <h4 className="scena-editor__drawer-section-title" style={{ marginTop: 16 }}>Live</h4>
-      <div className="scena-editor__element-grid">
-        {SCENA_UI_API_CAPABILITIES.elements.live.map((type) => (
-          <button key={type} type="button" className="scena-editor__element-tile" onClick={() => onAddElement(type)}>
-            {ELEMENT_ICONS[type]}
-            <span>{ELEMENT_LABELS[type]}</span>
-          </button>
-        ))}
-      </div>
+      {readyWidgets.length > 0 && <section className="scena-editor__element-section">
+        <div className="scena-editor__element-section-heading"><div><h4>Display widgets</h4><p>Content that updates while the Board is showing.</p></div></div>
+        <div className="scena-editor__element-grid">{readyWidgets.map((type) => renderElementTile(type))}</div>
+      </section>}
 
-      <LibraryPanel onAddLibraryAsset={onAddLibraryAsset} />
+      {connectionPreviews.length > 0 && <section className="scena-editor__element-section">
+        <div className="scena-editor__element-section-heading"><div><h4>Connections</h4><p>Design the placement now; connect an API or media source later.</p></div></div>
+        <div className="scena-editor__element-grid">{connectionPreviews.map((type) => renderElementTile(type, "setup"))}</div>
+      </section>}
+
+      {!hasResults && <div className="scena-editor__element-empty"><MagnifyingGlass size={22} /><strong>No matching content</strong><span>Try “menu,” “clock,” “QR,” or “shape.”</span></div>}
+
+      {!normalized && <LibraryPanel onAddLibraryAsset={onAddLibraryAsset} />}
     </div>
   );
 }
@@ -188,6 +268,20 @@ export function TextPresetsPanel({ onInsertPreset }: TextPresetsPanelProps) {
       ))}
     </div>
   );
+}
+
+export function TemplatesPanel({ onApply }: { onApply: (templateId: StudioTemplateId) => void }) {
+  return <div className="scena-editor__preset-list">{STUDIO_TEMPLATES.map((template) => <button key={template.id} type="button" className="scena-editor__template-card" onClick={() => onApply(template.id)}>
+    <span className="scena-editor__template-preview" style={{ background: `linear-gradient(135deg, ${template.colors[0]} 0 70%, ${template.colors[1]} 70%)` }} />
+    <span><strong>{template.name}</strong><small>{template.description}</small></span>
+  </button>)}</div>;
+}
+
+export function BrandPanel({ onApply }: { onApply: (brand: BrandPreset) => void }) {
+  return <div className="scena-editor__preset-list"><p className="scena-editor__preset-intro">Apply a coordinated palette and font to the selected Scene.</p>{BRAND_PRESETS.map((brand) => <button key={brand.id} type="button" className="scena-editor__brand-card" onClick={() => onApply(brand)}>
+    <span className="scena-editor__brand-swatches"><i style={{ background: brand.background }} /><i style={{ background: brand.surface }} /><i style={{ background: brand.accent }} /></span>
+    <span><strong>{brand.name}</strong><small>{brand.font === "display" ? "Bricolage Grotesque" : "Instrument Sans"}</small></span>
+  </button>)}</div>;
 }
 
 /* ------------------------------------------------------------------ */

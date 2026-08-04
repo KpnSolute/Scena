@@ -1,0 +1,41 @@
+/* Public legal pages (/terms, /privacy). Deliberately plain: long-form prose
+   with a comfortable measure, no marketing chrome. */
+
+.scena-legal { min-height: 100vh; display: flex; flex-direction: column; background: var(--scena-surface-0); }
+
+.scena-legal__head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--scena-space-4);
+  max-width: 760px; width: 100%; margin: 0 auto;
+  padding: var(--scena-space-6) var(--scena-space-6);
+}
+.scena-legal__logo {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--scena-font-display); font-size: var(--scena-text-lg);
+  color: var(--scena-text-primary); text-decoration: none;
+}
+.scena-legal__logo-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: var(--scena-radius-sm); background: var(--scena-violet);
+}
+.scena-legal__back { font-size: var(--scena-text-sm); color: var(--scena-text-muted); text-decoration: none; }
+.scena-legal__back:hover { color: var(--scena-text-primary); }
+
+.scena-legal__body {
+  flex: 1; max-width: 760px; width: 100%; margin: 0 auto;
+  padding: var(--scena-space-6) var(--scena-space-6) var(--scena-space-16);
+}
+.scena-legal__body h1 { font-family: var(--scena-font-display); font-size: var(--scena-text-3xl); margin-bottom: var(--scena-space-2); }
+.scena-legal__updated { font-size: var(--scena-text-sm); color: var(--scena-text-muted); margin-bottom: var(--scena-space-8); }
+.scena-legal__body section { margin-bottom: var(--scena-space-8); }
+.scena-legal__body h2 { font-size: var(--scena-text-lg); margin-bottom: var(--scena-space-3); }
+.scena-legal__body p { color: var(--scena-text-secondary); line-height: 1.7; margin-bottom: var(--scena-space-3); }
+.scena-legal__body a { color: var(--scena-violet); }
+
+.scena-legal__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--scena-space-4); flex-wrap: wrap;
+  max-width: 760px; width: 100%; margin: 0 auto;
+  padding: var(--scena-space-6); border-top: 1px solid var(--scena-border);
+  font-size: var(--scena-text-sm); color: var(--scena-text-muted);
+}
+.scena-legal__foot a { color: var(--scena-text-muted); }
+.scena-legal__foot a:hover { color: var(--scena-text-primary); }
