@@ -127,7 +127,7 @@ export function DisplayRoute() {
 
 /** Plain positioned-box renderer — proves layout/tile/viewport/rotation
  * resolution end to end without investing in kiosk visual polish. */
-function LayoutRenderer({ state }: { state: Extract<DisplayState, { status: "showing" }> }) {
+export function LayoutRenderer({ state }: { state: Extract<DisplayState, { status: "showing" }> }) {
   const { layout, viewport, rotation_degrees } = state;
   return <div
     className="layout-canvas"
@@ -135,13 +135,13 @@ function LayoutRenderer({ state }: { state: Extract<DisplayState, { status: "sho
       position: "relative",
       width: "100vw",
       height: "100vh",
-      background: layout.background_color,
+      background: state.board?.background_color ?? layout?.background_color ?? "#000000",
       overflow: "hidden",
       transform: rotation_degrees ? `rotate(${rotation_degrees}deg)` : undefined,
       clipPath: `inset(${viewport.y}% ${100 - viewport.x - viewport.width}% ${100 - viewport.y - viewport.height}% ${viewport.x}%)`,
     }}
   >
-    {state.board ? <BoardRenderer board={state.board} /> : layout.tiles.filter((t) => t.is_visible).map((tile) => (
+    {state.board ? <BoardRenderer board={state.board} /> : layout?.tiles.filter((t) => t.is_visible).map((tile) => (
       <div
         key={tile.id}
         style={{

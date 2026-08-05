@@ -13,6 +13,11 @@ Fixed the live Display gateway query that selected a nonexistent
 schema mismatch caused every paired Display poll to return HTTP 500 precisely
 when playback should begin.
 
+Fixed Board-only kiosk playback after live acceptance exposed that the Display
+shell still required a legacy Layout object before rendering `BoardRenderer`.
+The shell now uses the Board background and renders its scenes without a Layout;
+a regression test covers the exact production gateway payload shape.
+
 ## 2026-08-05 — Connected Content production activation
 
 Applied the Connected Content schema and deployed `content-source` and

@@ -1,7 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { BoardRenderer } from "./BoardRenderer";
+import { LayoutRenderer } from "./DisplayRoute";
 import type { BoardData } from "./resolveDisplayState";
+import type { DisplayState } from "../lib/display";
 
 const board: BoardData = {
   id: "board-1",
@@ -52,5 +54,25 @@ describe("BoardRenderer", () => {
     expect(screen.getByText("Live Board content")).toBeTruthy();
     expect(document.querySelector('[data-board-id="board-1"]')?.getAttribute("data-session-started-at")).toBe(board.session_started_at);
     expect(document.querySelector('[data-board-id="board-1"]')?.getAttribute("data-session-updated-at")).toBe(board.session_updated_at);
+  });
+
+  it("renders a Board-only gateway payload without requiring a legacy Layout", () => {
+    const boardOnlyState = {
+      status: "showing",
+      screen_name: "Cafe display",
+      session: { id: "session-1", name: "Lunch" },
+      display_mode: "single",
+      rotation_degrees: 0,
+      viewport: { x: 0, y: 0, width: 100, height: 100 },
+      content_version: "board:board-1:3",
+      server_time: "2026-08-05T20:00:00.000Z",
+      board,
+      org_id: "workspace-1",
+    } as unknown as Extract<DisplayState, { status: "showing" }>;
+
+    render(<LayoutRenderer state={boardOnlyState} />);
+
+    expect(screen.getByText("Live Board content")).toBeTruthy();
+    expect(document.querySelector(".layout-canvas")?.getAttribute("style")).toContain("background: rgb(0, 0, 0)");
   });
 });
