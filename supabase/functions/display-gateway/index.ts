@@ -45,7 +45,7 @@ serveJson(async (req) => {
   // Ready screen: find its current live assignment, if any.
   const { data: sessionScreen, error: ssError } = await admin
     .from("display_session_screens")
-      .select("id, session_id, is_enabled, is_primary, layout_id, rotation_degrees, viewport_x_percent, viewport_y_percent, viewport_width_percent, viewport_height_percent, updated_at")
+      .select("id, session_id, is_enabled, is_primary, layout_id, rotation_degrees, viewport_x_percent, viewport_y_percent, viewport_width_percent, viewport_height_percent")
     .eq("screen_id", screen.id)
     .eq("assignment_status", "active")
     .maybeSingle();

@@ -5,6 +5,8 @@ import {
   holdsDisplays,
   sessionEventLabel,
   sessionStateLabel,
+  startTransitionPath,
+  stopTransitionPath,
   type SessionState,
 } from "./sessionControl";
 
@@ -72,6 +74,41 @@ describe("holdsDisplays", () => {
     expect(holdsDisplays("ready")).toBe(false);
     expect(holdsDisplays("stopped")).toBe(false);
     expect(holdsDisplays("archived")).toBe(false);
+  });
+});
+
+describe("lifecycle paths", () => {
+  it("starts drafts and restarts stopped or failed Sessions through every required gate", () => {
+    for (const state of ["draft", "stopped", "failed"] as const) {
+      expect(startTransitionPath(state)).toEqual(["ready", "starting", "active"]);
+    }
+  });
+
+  it("starts ready Sessions and resumes paused Sessions without illegal jumps", () => {
+    expect(startTransitionPath("ready")).toEqual(["starting", "active"]);
+    expect(startTransitionPath("paused")).toEqual(["active"]);
+    expect(startTransitionPath("active")).toEqual([]);
+  });
+
+  it("stops every state that can still own Displays through stopping", () => {
+    for (const state of ["starting", "active", "degraded", "paused", "failed"] as const) {
+      expect(stopTransitionPath(state)).toEqual(["stopping", "stopped"]);
+    }
+    expect(stopTransitionPath("draft")).toEqual([]);
+  });
+
+  it("contains only database-allowed hops across a complete operating cycle", () => {
+    const cycle: SessionState[] = [
+      "draft",
+      ...startTransitionPath("draft"),
+      "paused",
+      ...startTransitionPath("paused"),
+      ...stopTransitionPath("active"),
+    ];
+    for (let index = 0; index < cycle.length - 1; index += 1) {
+      expect(canTransition(cycle[index], cycle[index + 1])).toBe(true);
+    }
+    expect(cycle).toEqual(["draft", "ready", "starting", "active", "paused", "active", "stopping", "stopped"]);
   });
 });
 

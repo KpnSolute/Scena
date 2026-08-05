@@ -3,6 +3,7 @@ import { broadcastOrgInvalidation } from "../services/supabase/invalidation";
 import { ApiError, mapPostgresError } from "../shared/errors";
 import { requireBoolean, requireDisplayMode, requirePercent, requireRotation, requireString, requireUuid, type DisplayMode } from "../shared/validation";
 import type { Tables } from "../shared/database.types";
+import { startTransitionPath, stopTransitionPath, transitionSessionThrough } from "./sessionControl";
 
 export type DisplaySession = Tables<"display_sessions"> & { board_id: string | null };
 export type SessionScreen = Tables<"display_session_screens">;
@@ -98,26 +99,12 @@ export async function setDisplayMode(orgId: string, sessionId: string, mode: Dis
   return withBoardId(data);
 }
 
-/** Flips status -> active. Screen-count / layout-completeness / single-mode
- * enabled-count rules are enforced by validate_display_session_activation
- * and prepare_session_screen_assignment; failures surface as LAYOUT_INVALID
- * or SCREEN_LIMIT_REACHED via mapPostgresError. */
+/** Starts a draft through every authoritative lifecycle gate. */
 export async function startSession(orgId: string, sessionId: string, startedBy: string): Promise<DisplaySession> {
   requireUuid(orgId, "org_id");
   requireUuid(sessionId, "session_id");
   requireUuid(startedBy, "started_by");
-  const supabase = requireSupabase();
-  const { data, error } = await supabase
-    .from("display_sessions")
-    .update({ status: "active", started_by: startedBy, started_at: new Date().toISOString() })
-    .eq("org_id", orgId)
-    .eq("id", sessionId)
-    .eq("status", "draft")
-    .select("*")
-    .single();
-  if (error) throw mapPostgresError(error);
-  if (!data) throw new ApiError("SESSION_NOT_DRAFT", "Only a draft session can be started.", 409);
-  broadcastOrgInvalidation(orgId);
+  const data = await transitionSessionThrough(orgId, sessionId, startTransitionPath("draft"));
   return withBoardId(data);
 }
 
@@ -128,18 +115,7 @@ export async function stopSession(orgId: string, sessionId: string, stoppedBy: s
   requireUuid(orgId, "org_id");
   requireUuid(sessionId, "session_id");
   requireUuid(stoppedBy, "stopped_by");
-  const supabase = requireSupabase();
-  const { data, error } = await supabase
-    .from("display_sessions")
-    .update({ status: "stopped", stopped_by: stoppedBy, stopped_at: new Date().toISOString() })
-    .eq("org_id", orgId)
-    .eq("id", sessionId)
-    .eq("status", "active")
-    .select("*")
-    .single();
-  if (error) throw mapPostgresError(error);
-  if (!data) throw new ApiError("SESSION_NOT_ACTIVE", "Only an active session can be stopped.", 409);
-  broadcastOrgInvalidation(orgId);
+  const data = await transitionSessionThrough(orgId, sessionId, stopTransitionPath("active"));
   return withBoardId(data);
 }
 

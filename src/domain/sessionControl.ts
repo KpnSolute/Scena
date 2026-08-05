@@ -52,6 +52,48 @@ export function canTransition(from: SessionState, to: SessionState): boolean {
   return ALLOWED_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
+/** Ordered database transitions required to start or resume a Session. */
+export function startTransitionPath(from: SessionState): SessionState[] {
+  switch (from) {
+    case "paused":
+      return ["active"];
+    case "ready":
+      return ["starting", "active"];
+    case "draft":
+    case "stopped":
+    case "failed":
+      return ["ready", "starting", "active"];
+    default:
+      return [];
+  }
+}
+
+/** Ordered database transitions required to release a live Session. */
+export function stopTransitionPath(from: SessionState): SessionState[] {
+  switch (from) {
+    case "starting":
+    case "active":
+    case "degraded":
+    case "paused":
+    case "failed":
+      return ["stopping", "stopped"];
+    default:
+      return [];
+  }
+}
+
+/** Runs a validated sequence through the authoritative Session RPC. */
+export async function transitionSessionThrough(
+  orgId: string,
+  sessionId: string,
+  steps: readonly SessionState[],
+): Promise<Tables<"display_sessions">> {
+  if (steps.length === 0) throw new Error("No Session lifecycle transition is available from this state.");
+  let result: Tables<"display_sessions"> | null = null;
+  for (const step of steps) result = await transitionSession(orgId, sessionId, step);
+  return result!;
+}
+
 /** States in which a Session still holds its Displays and consumes plan capacity. */
 export function holdsDisplays(state: SessionState): boolean {
   return state === "starting" || state === "active" || state === "degraded" || state === "paused";

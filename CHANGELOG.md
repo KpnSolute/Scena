@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-05 — Complete Session lifecycle and Display playback repair
+
+Replaced the legacy direct Session status writes with the authoritative staged
+lifecycle: draft to ready to starting to active, pause and resume, then stopping
+to stopped. The Session builder, list actions, and detail controls now share one
+transition-path definition, preventing customer-facing controls from bypassing
+database readiness, role, entitlement, and assignment checks.
+
+Fixed the live Display gateway query that selected a nonexistent
+`display_session_screens.updated_at` column after a Session became active. That
+schema mismatch caused every paired Display poll to return HTTP 500 precisely
+when playback should begin.
+
 ## 2026-08-05 — Connected Content production activation
 
 Applied the Connected Content schema and deployed `content-source` and

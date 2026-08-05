@@ -152,22 +152,12 @@ export function SessionDetailPage() {
   // that is not ready fails there with the specific blocking reason.
   function start() {
     if (!session) return;
-    switch (session.status as Control.SessionState) {
-      case "paused":
-        return void moveTo("active");
-      case "ready":
-        return void moveTo("starting", "active");
-      case "draft":
-      case "stopped":
-      case "failed":
-        return void moveTo("ready", "starting", "active");
-      default:
-        return;
-    }
+    void moveTo(...Control.startTransitionPath(session.status as Control.SessionState));
   }
 
   function stop() {
-    void moveTo("stopping", "stopped");
+    if (!session) return;
+    void moveTo(...Control.stopTransitionPath(session.status as Control.SessionState));
   }
 
   async function deleteDraft() {
