@@ -38,7 +38,7 @@ export function createSceneFromTemplate(templateId: StudioTemplateId, index: num
   } else {
     elements = [text(uid(), "TODAY’S MENU", 8, 7, 84, 12, 68, 800, "center"), shape(uid(), 8, 23, 84, 1, "#f59e0b"), text(uid(), "BREAKFAST", 9, 29, 37, 8, 34, 800), text(uid(), "Menu item ........ $0.00\nMenu item ........ $0.00\nMenu item ........ $0.00", 9, 41, 37, 36, 25), text(uid(), "LUNCH", 54, 29, 37, 8, 34, 800), text(uid(), "Menu item ........ $0.00\nMenu item ........ $0.00\nMenu item ........ $0.00", 54, 41, 37, 36, 25)];
   }
-  return { id, name: STUDIO_TEMPLATES.find((item) => item.id === templateId)?.name ?? `Scene ${index + 1}`, sort_order: index, duration_ms: 10_000, transition_type: "fade", transition_config: {}, background: { type: "color", value: background }, is_hidden: false, elements };
+  return { id, name: STUDIO_TEMPLATES.find((item) => item.id === templateId)?.name ?? `Scene ${index + 1}`, scene_type: "canvas", config: {}, sort_order: index, duration_ms: 10_000, transition_type: "fade", transition_config: {}, background: { type: "color", value: background }, is_hidden: false, elements };
 }
 
 export function applyBrandPreset(scene: BoardScene, brand: BrandPreset): Partial<BoardScene> {

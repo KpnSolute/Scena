@@ -291,7 +291,7 @@ export function BrandPanel({ onApply }: { onApply: (brand: BrandPreset) => void 
 export interface UploadsPanelProps {
   /** null = still loading (skeletons); [] = empty state. */
   assets: AssetSummary[] | null;
-  onInsertAsset: (assetId: string) => void;
+  onInsertAsset: (asset: AssetSummary) => void;
   previewUrls?: ReadonlyMap<string, string>;
 }
 
@@ -311,9 +311,12 @@ export function UploadsPanel({ assets, previewUrls, onInsertAsset }: UploadsPane
   return (
     <div>
       {assets.map((asset) => (
-        <button key={asset.id} type="button" className="scena-editor__asset-tile" onClick={() => onInsertAsset(asset.id)}>
+        <button key={asset.id} type="button" className="scena-editor__asset-tile" onClick={() => onInsertAsset(asset)}>
           {previewUrls?.get(asset.id) ? <img src={previewUrls.get(asset.id)} alt="" /> : <span className="scena-editor__asset-tile-fallback"><ImageSquare size={18} /></span>}
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{asset.original_filename}</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {asset.original_filename}
+            <small>{asset.asset_kind === "powerpoint" || asset.asset_kind === "pdf" ? `${asset.page_count ?? 1} slides · add as Scene` : "Add to Scene"}</small>
+          </span>
         </button>
       ))}
     </div>

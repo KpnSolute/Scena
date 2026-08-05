@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Broadcast } from "@phosphor-icons/react";
+import { Broadcast, Browsers, Columns, PresentationChart, SelectionAll } from "@phosphor-icons/react";
 import { useManagerContext } from "../../app/ManagerContextProvider";
 import { useBoardEditor } from "./useBoardEditor";
-import type { ElementType, SceneElement, BoardScene, ShapeVariant } from "../../services/scena-api/boards";
+import type { ElementType, SceneElement, ShapeVariant } from "../../services/scena-api/boards";
 import { SHAPE_VARIANT_PRESETS, SHAPE_VARIANT_SIZE } from "../../components/editor/shapeVariants";
 import { getAsset, listAssets, selectAssetPreviewVariant, signAssetRead } from "../../services/scena-api/assets";
 import type { AssetSummary } from "../../services/scena-api/assets";
@@ -25,6 +25,8 @@ import { Button } from "../../components/ui/Button";
 import { Spinner } from "../../components/ui/Progress";
 import { ErrorBanner } from "../../components/ui/ErrorBanner";
 import { useToast } from "../../components/ui/Toast";
+import { applySignLayout, createBoardScene, placementForNewElement } from "../../domain/boardSceneTypes";
+import type { BoardSceneType } from "../../services/scena-api/boards";
 
 const LIVE_ELEMENT_TYPES: ElementType[] = [
   "clock", "date", "countdown", "qr_dynamic", "music_player", "ticker", "carousel", "video", "weather", "data_text",
@@ -76,6 +78,7 @@ export function BoardEditorPage() {
   const [activePanel, setActivePanel] = useState<EditorRailItemKey | null>("elements");
   const [scenesVisible, setScenesVisible] = useState(true);
   const [assets, setAssets] = useState<AssetSummary[] | null>(null);
+  const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const liveSessionId = searchParams.get("liveSession");
   const [assetPreviewUrls, setAssetPreviewUrls] = useState<Map<string, string>>(new Map());
   const editorRootRef = useRef<HTMLDivElement>(null);
@@ -187,15 +190,16 @@ export function BoardEditorPage() {
   function handleAddElement(type: ElementType, assetId?: string, configOverride?: Record<string, unknown>) {
     if (!scene) return;
     const size = DEFAULT_SIZE[type];
+    const zone = placementForNewElement(scene);
     const element: SceneElement = {
       id: crypto.randomUUID(),
       element_type: type,
       render_mode: LIVE_ELEMENT_TYPES.includes(type) ? "live" : "static",
       name: null,
-      x: 50 - size.width / 2,
-      y: 50 - size.height / 2,
-      width: size.width,
-      height: size.height,
+      x: zone?.x ?? 50 - size.width / 2,
+      y: zone?.y ?? 50 - size.height / 2,
+      width: zone?.width ?? size.width,
+      height: zone?.height ?? size.height,
       rotation: 0,
       opacity: 1,
       z_index: scene.elements.length,
@@ -203,7 +207,7 @@ export function BoardEditorPage() {
       is_visible: true,
       asset_id: assetId ?? null,
       asset_page_id: null,
-      config: configOverride ?? defaultConfigFor(type),
+      config: { ...(configOverride ?? defaultConfigFor(type)), ...(zone ? { zone_id: zone.id } : {}) },
     };
     editor.addElement(scene.id, element);
   }
@@ -260,19 +264,25 @@ export function BoardEditorPage() {
     editor.addElement(scene.id, element);
   }
 
-  function handleAddScene() {
-    const newScene: BoardScene = {
-      id: crypto.randomUUID(),
-      name: `Scene ${snapshot.scenes.length + 1}`,
-      sort_order: snapshot.scenes.length,
-      duration_ms: 10_000,
-      transition_type: "fade",
-      transition_config: {},
-      background: { type: "color", value: snapshot.board.background_color },
-      is_hidden: false,
-      elements: [],
-    };
+  function handleAddScene(type?: BoardSceneType) {
+    if (!type) {
+      setScenePickerOpen(true);
+      return;
+    }
+    const newScene = createBoardScene(type, snapshot.scenes.length);
+    newScene.background = { type: "color", value: snapshot.board.background_color };
     editor.addScene(newScene);
+    setScenePickerOpen(false);
+  }
+
+  function handleInsertAsset(asset: AssetSummary) {
+    if (asset.asset_kind === "powerpoint" || asset.asset_kind === "pdf") {
+      const presentation = createBoardScene("presentation", snapshot.scenes.length, { asset });
+      presentation.background = { type: "color", value: snapshot.board.background_color };
+      editor.addScene(presentation);
+      return;
+    }
+    handleAddElement("asset_page", asset.id);
   }
 
   async function handleSave() {
@@ -301,7 +311,7 @@ export function BoardEditorPage() {
   const panelContent =
     activePanel === "elements" ? <ElementsGridPanel onAddElement={(type) => handleAddElement(type)} onAddShape={handleAddShape} onAddLibraryAsset={(type, config) => handleAddElement(type, undefined, config)} />
     : activePanel === "text" ? <TextPresetsPanel onInsertPreset={handleAddTextPreset} />
-    : activePanel === "uploads" ? <UploadsPanel assets={assets} previewUrls={assetPreviewUrls} onInsertAsset={(assetId) => handleAddElement("asset_page", assetId)} />
+    : activePanel === "uploads" ? <UploadsPanel assets={assets} previewUrls={assetPreviewUrls} onInsertAsset={handleInsertAsset} />
     : activePanel === "templates" ? <TemplatesPanel onApply={(templateId) => editor.addScene(createSceneFromTemplate(templateId, snapshot.scenes.length))} />
     : activePanel === "brand" ? <BrandPanel onApply={(brand) => scene && editor.updateScene(scene.id, applyBrandPreset(scene, brand))} />
     : null;
@@ -371,6 +381,10 @@ export function BoardEditorPage() {
         onAddScene={handleAddScene}
         onReorder={editor.reorderScenes}
         onUpdateScene={(sceneId, patch) => editor.updateScene(sceneId, patch)}
+        onApplySignLayout={(sceneId, layoutId) => {
+          const current = snapshot.scenes.find((item) => item.id === sceneId);
+          if (current) editor.updateScene(sceneId, applySignLayout(current, layoutId));
+        }}
         onDuplicate={editor.duplicateScene}
         onDelete={editor.removeScene}
       />
@@ -387,6 +401,29 @@ export function BoardEditorPage() {
         onToggleFullscreen={fullscreen.toggle}
         fullscreenSupported={fullscreen.supported}
       />
+
+      <Modal
+        open={scenePickerOpen}
+        onClose={() => setScenePickerOpen(false)}
+        title="Choose a Scene type"
+        description="A Board is a playlist of Scenes. Pick how this Scene should behave."
+        size="lg"
+      >
+        <div className="scena-editor__scene-type-grid">
+          <button type="button" onClick={() => handleAddScene("canvas")}>
+            <SelectionAll size={28} /><strong>Canvas</strong><span>Place text, emoji, images, shapes, and live data freely.</span>
+          </button>
+          <button type="button" onClick={() => handleAddScene("sign")}>
+            <Columns size={28} /><strong>Sign layout</strong><span>Snap content into two or more adjustable zones.</span>
+          </button>
+          <button type="button" onClick={() => { setScenePickerOpen(false); setActivePanel("uploads"); }}>
+            <PresentationChart size={28} /><strong>Presentation</strong><span>Choose a PowerPoint or PDF; all slides play inside one Scene.</span>
+          </button>
+          <button type="button" onClick={() => handleAddScene("canvas")}>
+            <Browsers size={28} /><strong>Start blank</strong><span>A clean full-screen Scene ready for imported content.</span>
+          </button>
+        </div>
+      </Modal>
 
       <RevisionsDrawer
         open={revisionsOpen}

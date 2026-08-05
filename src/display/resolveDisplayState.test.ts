@@ -20,6 +20,7 @@ function session(overrides: Partial<SessionData> = {}): SessionData {
 function sessionScreen(overrides: Partial<SessionScreenData> = {}): SessionScreenData {
   return {
     id: "ss-1",
+    board_id: null,
     is_enabled: true,
     is_primary: false,
     layout_id: "layout-1",

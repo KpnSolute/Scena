@@ -41,6 +41,7 @@ export const SHAPE_VARIANTS: readonly ShapeVariant[] = [
 export type BorderStyle = "solid" | "dashed" | "dotted";
 
 export type RenderMode = "static" | "live" | "interactive";
+export type BoardSceneType = "canvas" | "sign" | "presentation";
 export type TransitionType =
   | "none"
   | "fade"
@@ -441,6 +442,8 @@ export const ELEMENTS_WITHOUT_DATA_SOURCE: readonly ElementType[] = ["weather", 
 export interface BoardScene {
   id: string;
   name: string;
+  scene_type: BoardSceneType;
+  config: Record<string, unknown>;
   sort_order: number;
   duration_ms: number;
   transition_type: TransitionType;
@@ -520,11 +523,22 @@ export async function getBoard(
   boardId: string,
   signal?: AbortSignal,
 ): Promise<{ snapshot: BoardSnapshot; request_id: string }> {
-  return callScenaFunction(
+  const response = await callScenaFunction<{ snapshot: BoardSnapshot; request_id: string }>(
     "board-interaction",
     { action: "get", board_id: boardId },
     { signal },
   );
+  return {
+    ...response,
+    snapshot: {
+      ...response.snapshot,
+      scenes: response.snapshot.scenes.map((scene) => ({
+        ...scene,
+        scene_type: scene.scene_type ?? "canvas",
+        config: scene.config ?? {},
+      })),
+    },
+  };
 }
 
 export async function saveBoard(
@@ -618,6 +632,8 @@ export function createBlankBoardSnapshot(
       {
         id: initialSceneId,
         name: "Scene 1",
+        scene_type: "canvas",
+        config: {},
         sort_order: 0,
         duration_ms: 10_000,
         transition_type: "fade",

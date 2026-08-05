@@ -53,6 +53,8 @@ function buildDemoScenes(): BoardScene[] {
     {
       id: "demo-scene-menu",
       name: "Menu",
+      scene_type: "canvas",
+      config: {},
       sort_order: 0,
       duration_ms: 8000,
       transition_type: "fade",
@@ -72,6 +74,8 @@ function buildDemoScenes(): BoardScene[] {
     {
       id: "demo-scene-happy-hour",
       name: "Happy hour",
+      scene_type: "canvas",
+      config: {},
       sort_order: 1,
       duration_ms: 6000,
       transition_type: "slide_left",
@@ -189,6 +193,8 @@ export function HeroEditorDemo() {
     const newScene: BoardScene = {
       id: crypto.randomUUID(),
       name: `Scene ${scenes.length + 1}`,
+      scene_type: "canvas",
+      config: {},
       sort_order: scenes.length,
       duration_ms: 10_000,
       transition_type: "fade",

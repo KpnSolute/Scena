@@ -9,6 +9,12 @@ import type { Tables } from "../shared/database.types";
 // (unapplied) grant-hardening migration this column list anticipates.
 export type Screen = Omit<Tables<"screens">, "device_token_hash">;
 
+export interface ScreenSessionLink {
+  session_id: string;
+  session_name: string;
+  status: string;
+}
+
 const SAFE_COLUMNS = "id, org_id, location_id, name, status, claimed_at, last_seen_at, revoked_at, created_at, updated_at";
 
 export async function listScreens(orgId: string, locationId?: string): Promise<Screen[]> {
@@ -19,6 +25,32 @@ export async function listScreens(orgId: string, locationId?: string): Promise<S
   const { data, error } = await query;
   if (error) throw mapPostgresError(error);
   return (data ?? []) as unknown as Screen[];
+}
+
+/** Current retained Session route for each Display. Removed assignments are
+ * history and deliberately do not create an inventory-to-control-room link. */
+export async function listScreenSessionLinks(orgId: string): Promise<Map<string, ScreenSessionLink>> {
+  requireUuid(orgId, "org_id");
+  const supabase = requireSupabase();
+  const { data: assignments, error: assignmentError } = await supabase
+    .from("display_session_screens")
+    .select("screen_id, session_id")
+    .eq("org_id", orgId)
+    .neq("assignment_status", "removed");
+  if (assignmentError) throw mapPostgresError(assignmentError);
+  const sessionIds = [...new Set((assignments ?? []).map((assignment) => assignment.session_id))];
+  if (!sessionIds.length) return new Map();
+  const { data: sessions, error: sessionError } = await supabase
+    .from("display_sessions")
+    .select("id, name, status")
+    .eq("org_id", orgId)
+    .in("id", sessionIds);
+  if (sessionError) throw mapPostgresError(sessionError);
+  const sessionById = new Map((sessions ?? []).map((session) => [session.id, session]));
+  return new Map((assignments ?? []).flatMap((assignment) => {
+    const session = sessionById.get(assignment.session_id);
+    return session ? [[assignment.screen_id, { session_id: session.id, session_name: session.name, status: session.status }] as const] : [];
+  }));
 }
 
 export async function getScreen(orgId: string, screenId: string): Promise<Screen | null> {

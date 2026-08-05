@@ -23,6 +23,8 @@ import { ErrorBanner } from "../../components/ui/ErrorBanner";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useToast } from "../../components/ui/Toast";
+import { DisplayTopology } from "../../components/sessions/DisplayTopology";
+import type { DisplayViewport } from "../../domain/displayTopology";
 
 // duplicate/extend require a shared_layout_id; independent/single forbid one
 // (enforced by setDisplayMode and the display_sessions_check constraint).
@@ -298,6 +300,31 @@ export function SessionDetailPage() {
     }
   }
 
+  async function changeScreenViewport(sessionScreenId: string, viewport: DisplayViewport) {
+    try {
+      await Sessions.updateSessionScreen(context.workspace.id, sessionScreenId, { viewport });
+      refresh();
+    } catch (err) {
+      showError(err, "Couldn't move this Display.");
+    }
+  }
+
+  async function changeScreenBoard(sessionScreenId: string, boardId: string | null) {
+    if (!session) return;
+    try {
+      // Keep a Session-level Board as the safe fallback required by the
+      // current lifecycle/readiness contract. Independent outputs may then
+      // override it with their own Board.
+      if (boardId && !session.board_id && session.status === "draft") {
+        await Sessions.setSessionBoard(context.workspace.id, session.id, boardId);
+      }
+      await Sessions.updateSessionScreen(context.workspace.id, sessionScreenId, { board_id: boardId });
+      refresh();
+    } catch (err) {
+      showError(err, "Couldn't route this Board to the Display.");
+    }
+  }
+
   if (notFound) {
     return (
       <div className="scena-page">
@@ -546,6 +573,18 @@ export function SessionDetailPage() {
           )}
         </Card>
           </div>
+
+        {workspaceBoards !== null && (
+          <DisplayTopology
+            screens={session.screens}
+            screenNames={screenNames}
+            boards={workspaceBoards}
+            fallbackBoardId={session.board_id}
+            disabled={!composable}
+            onViewport={(screenId, viewport) => void changeScreenViewport(screenId, viewport)}
+            onBoard={(screenId, boardId) => void changeScreenBoard(screenId, boardId)}
+          />
+        )}
 
         <Card className="scena-session-panel scena-session-panel--displays">
           <div className="scena-session-panel__topline">

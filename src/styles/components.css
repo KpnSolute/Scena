@@ -207,8 +207,7 @@
 .scena-menu__shortcut { margin-left: auto; font-family: var(--scena-font-mono); font-size: var(--scena-text-xs); color: var(--scena-text-muted); }
 .scena-menu__separator { height: 1px; background: var(--scena-border); margin: var(--scena-space-2) var(--scena-space-1); }
 .scena-menu-wrap { position: relative; display: inline-block; }
-.scena-menu-popover { position: absolute; top: calc(100% + 8px); right: 0; }
-.scena-menu-popover--left { right: auto; left: 0; }
+.scena-menu-popover { position: fixed; z-index: 120; }
 
 /* ── Tooltip ────────────────────────────────────────── */
 .scena-tooltip {
@@ -280,6 +279,7 @@
 .scena-table tbody tr { transition: background var(--scena-duration-fast); }
 .scena-table tbody tr:hover { background: var(--scena-surface-hover); }
 .scena-table tbody tr[data-selected="true"] { background: rgba(91,124,250,.10); }
+.scena-display-session-link { display: block; margin-top: 3px; color: var(--scena-text-muted); font-size: var(--scena-text-xs); }
 
 /* ── Toast ──────────────────────────────────────────── */
 .scena-toast-region { position: fixed; bottom: var(--scena-space-6); left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: var(--scena-space-2); align-items: center; }

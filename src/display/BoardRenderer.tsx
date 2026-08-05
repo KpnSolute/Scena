@@ -26,6 +26,7 @@ export function BoardRenderer({ board }: { board: BoardData }) {
       data-session-updated-at={board.session_updated_at}
       style={{ background: backgroundValue(scene, board.background_color) }}
     >
+      {scene.scene_type === "presentation" && <PresentationScene scene={scene} />}
       {scene.elements.filter((element) => element.is_visible).map((element) => (
         <div
           key={element.id}
@@ -40,6 +41,23 @@ export function BoardRenderer({ board }: { board: BoardData }) {
       ))}
     </div>
   );
+}
+
+function PresentationScene({ scene }: { scene: BoardSceneData }) {
+  const urls = Array.isArray(scene.config.slide_urls) ? scene.config.slide_urls.filter((url): url is string => typeof url === "string") : [];
+  const fallbackDuration = typeof scene.config.slide_duration_ms === "number" ? scene.config.slide_duration_ms : 8_000;
+  const durations = Array.isArray(scene.config.slide_durations_ms) ? scene.config.slide_durations_ms : [];
+  const [index, setIndex] = useState(0);
+  useEffect(() => setIndex(0), [scene.id, urls.length]);
+  useEffect(() => {
+    if (urls.length < 2) return;
+    const value = durations[index];
+    const duration = typeof value === "number" && value >= 1_000 ? value : fallbackDuration;
+    const timer = window.setTimeout(() => setIndex((current) => (current + 1) % urls.length), duration);
+    return () => window.clearTimeout(timer);
+  }, [durations, fallbackDuration, index, urls.length]);
+  if (!urls.length) return <div className="display-board__presentation-missing">Presentation media is processing.</div>;
+  return <img className="display-board__presentation" src={urls[index]} alt="" style={{ objectFit: scene.config.fit === "cover" ? "cover" : "contain" }} />;
 }
 
 function backgroundValue(scene: BoardSceneData, fallback: string): string {

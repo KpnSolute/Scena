@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Monitor, Plus, DotsThreeVertical, Trash, PencilSimple } from "@phosphor-icons/react";
+import { Broadcast, Monitor, Plus, DotsThreeVertical, Trash, PencilSimple } from "@phosphor-icons/react";
 import { useManagerContext } from "../../app/ManagerContextProvider";
 import { canManage } from "../../auth/organization-context";
 import * as Screens from "../../domain/screens";
@@ -20,13 +20,16 @@ export function ScreensPage() {
   const toast = useToast();
   const manage = canManage(context.role);
   const [screens, setScreens] = useState<Screens.Screen[] | null>(null);
+  const [sessionLinks, setSessionLinks] = useState<Map<string, Screens.ScreenSessionLink>>(new Map());
   const [error, setError] = useState<unknown>(null);
   const [revokeTarget, setRevokeTarget] = useState<Screens.Screen | null>(null);
   const [revoking, setRevoking] = useState(false);
 
   function load() {
     setError(null);
-    Screens.listScreens(context.workspace.id).then(setScreens).catch(setError);
+    Promise.all([Screens.listScreens(context.workspace.id), Screens.listScreenSessionLinks(context.workspace.id)])
+      .then(([nextScreens, links]) => { setScreens(nextScreens); setSessionLinks(links); })
+      .catch(setError);
   }
   useEffect(load, [context.workspace.id]);
 
@@ -85,7 +88,7 @@ export function ScreensPage() {
             <tbody>
               {screens.map((screen) => (
                 <tr key={screen.id}>
-                  <td><Link to={`/app/screens/${screen.id}`} style={{ fontWeight: 600 }}>{screen.name}</Link></td>
+                  <td><Link to={`/app/screens/${screen.id}`} style={{ fontWeight: 600 }}>{screen.name}</Link>{sessionLinks.get(screen.id) && <small className="scena-display-session-link">Session: {sessionLinks.get(screen.id)!.session_name}</small>}</td>
                   <td><StatusIndicator status={isOnline(screen) ? "online" : screen.status} /></td>
                   <td>{screen.last_seen_at ? new Date(screen.last_seen_at).toLocaleString() : "Never"}</td>
                   {manage && (
@@ -93,6 +96,7 @@ export function ScreensPage() {
                       <DropdownMenu
                         trigger={<IconButton icon={<DotsThreeVertical size={18} />} label="Display actions" size="sm" />}
                         items={[
+                          ...(sessionLinks.get(screen.id) ? [{ key: "control-room", icon: <Broadcast size={16} />, label: "Open control room", onSelect: () => navigate(`/app/sessions/${sessionLinks.get(screen.id)!.session_id}`) }] : []),
                           { key: "rename", icon: <PencilSimple size={16} />, label: "Rename", onSelect: () => handleRename(screen) },
                           { key: "revoke", icon: <Trash size={16} />, label: "Revoke", danger: true, disabled: screen.status === "revoked", onSelect: () => setRevokeTarget(screen) },
                         ]}

@@ -4,8 +4,8 @@ import { SceneStrip } from "./SceneStrip";
 import type { BoardScene } from "../../services/scena-api/boards";
 
 const scenes: BoardScene[] = [
-  { id: "one", name: "Breakfast", sort_order: 0, duration_ms: 8000, transition_type: "fade", transition_config: {}, background: {}, is_hidden: false, elements: [] },
-  { id: "two", name: "Lunch", sort_order: 1, duration_ms: 10000, transition_type: "slide_left", transition_config: {}, background: {}, is_hidden: false, elements: [] },
+  { id: "one", name: "Breakfast", scene_type: "canvas", config: {}, sort_order: 0, duration_ms: 8000, transition_type: "fade", transition_config: {}, background: {}, is_hidden: false, elements: [] },
+  { id: "two", name: "Lunch", scene_type: "canvas", config: {}, sort_order: 1, duration_ms: 10000, transition_type: "slide_left", transition_config: {}, background: {}, is_hidden: false, elements: [] },
 ];
 
 describe("SceneStrip", () => {

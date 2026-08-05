@@ -32,6 +32,7 @@ export interface LayoutData {
 
 export interface SessionScreenData {
   id: string;
+  board_id: string | null;
   is_enabled: boolean;
   is_primary: boolean;
   layout_id: string | null;
@@ -74,6 +75,8 @@ export interface BoardElementData {
 export interface BoardSceneData {
   id: string;
   name: string;
+  scene_type: "canvas" | "sign" | "presentation";
+  config: Record<string, unknown>;
   sort_order: number;
   duration_ms: number;
   transition_type: string;

@@ -43,7 +43,7 @@ serveJson(async (req) => {
   // Ready screen: find its current live assignment, if any.
   const { data: sessionScreen, error: ssError } = await admin
     .from("display_session_screens")
-      .select("id, session_id, is_enabled, is_primary, layout_id, rotation_degrees, viewport_x_percent, viewport_y_percent, viewport_width_percent, viewport_height_percent")
+      .select("id, session_id, is_enabled, is_primary, board_id, layout_id, rotation_degrees, viewport_x_percent, viewport_y_percent, viewport_width_percent, viewport_height_percent")
     .eq("screen_id", screen.id)
     .eq("assignment_status", "active")
     .maybeSingle();
@@ -62,7 +62,9 @@ serveJson(async (req) => {
 
   const layoutId = session && (session.display_mode === "duplicate" || session.display_mode === "extend") ? session.shared_layout_id : sessionScreen?.layout_id ?? null;
   const layout = layoutId ? await fetchResolvedLayout(admin, screen.org_id!, layoutId) : null;
-  const boardId = (session as SessionData & { board_id?: string | null } | null)?.board_id ?? null;
+  const sessionBoardId = (session as SessionData & { board_id?: string | null } | null)?.board_id ?? null;
+  const usesSharedBoard = session?.display_mode === "duplicate" || session?.display_mode === "extend";
+  const boardId = usesSharedBoard ? sessionBoardId : (sessionScreen as SessionScreenData | null)?.board_id ?? sessionBoardId;
   const board = boardId && session?.status === "active"
     ? await fetchBoardSnapshot(admin, screen.org_id!, boardId, (session as SessionData & { started_at?: string | null; location_id?: string | null }).started_at ?? null, session.updated_at, (session as SessionData & { location_id?: string | null }).location_id ?? screen.location_id)
     : null;
@@ -185,7 +187,7 @@ async function fetchBoardSnapshot(
   if (!board) return null;
 
   const [{ data: scenes, error: scenesError }, { data: elements, error: elementsError }, { data: location, error: locationError }] = await Promise.all([
-    admin.from("board_scenes").select("id, workspace_id, board_id, name, sort_order, duration_ms, transition_type, transition_config, background, is_hidden, updated_at").eq("workspace_id", workspaceId).eq("board_id", boardId).order("sort_order").order("created_at"),
+    admin.from("board_scenes").select("id, workspace_id, board_id, name, scene_type, config, sort_order, duration_ms, transition_type, transition_config, background, is_hidden, updated_at").eq("workspace_id", workspaceId).eq("board_id", boardId).order("sort_order").order("created_at"),
     admin.from("scene_elements").select("id, workspace_id, board_id, scene_id, element_type, render_mode, name, x, y, width, height, rotation, opacity, z_index, is_locked, is_visible, asset_id, asset_page_id, config, updated_at").eq("workspace_id", workspaceId).eq("board_id", boardId).eq("is_visible", true).order("z_index"),
     locationId ? admin.from("locations").select("timezone").eq("org_id", workspaceId).eq("id", locationId).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
@@ -200,9 +202,16 @@ async function fetchBoardSnapshot(
     : { data: [], error: null };
   if (sourcesError) throw ApiError.internal(sourcesError.message);
   const sourceById = new Map((sources ?? []).map((source) => [source.id, source]));
+  const assetIds = [...new Set([
+    ...(elements ?? []).map((row) => row.asset_id),
+    ...(scenes ?? []).map((row) => jsonRecord(row.config).asset_id),
+  ].filter((id): id is string => typeof id === "string" && id.length > 0))];
+  const assetMedia = await resolveAssetMedia(admin, workspaceId, assetIds);
   const elementsByScene = new Map<string, BoardElementData[]>();
   for (const row of elements ?? []) {
     const config = jsonRecord(row.config);
+    const mediaUrl = row.asset_page_id ? assetMedia.byPage.get(row.asset_page_id) : row.asset_id ? assetMedia.byAsset.get(row.asset_id) : null;
+    if (mediaUrl && !config.src) config.src = mediaUrl;
     if (timezone && (row.element_type === "clock" || row.element_type === "date") && !config.time_zone && !config.timeZone) config.time_zone = timezone;
     if (row.element_type === "data_text" && typeof config.source_id === "string" && typeof config.source_key === "string") {
       const source = sourceById.get(config.source_id);
@@ -227,6 +236,8 @@ async function fetchBoardSnapshot(
   const boardScenes: BoardSceneData[] = (scenes ?? []).filter((scene) => !scene.is_hidden).map((scene) => ({
     id: scene.id,
     name: scene.name,
+    scene_type: scene.scene_type === "sign" || scene.scene_type === "presentation" ? scene.scene_type : "canvas",
+    config: resolveSceneConfig(jsonRecord(scene.config), assetMedia),
     sort_order: Number(scene.sort_order),
     duration_ms: Number(scene.duration_ms),
     transition_type: scene.transition_type,
@@ -246,7 +257,7 @@ async function fetchBoardSnapshot(
     status: board.status,
     version: Number(board.version),
     updated_at: board.updated_at,
-    content_updated_at: (sources ?? []).map((source) => source.updated_at).sort().at(-1) ?? board.updated_at,
+    content_updated_at: [...(sources ?? []).map((source) => source.updated_at), assetMedia.latestCreatedAt ?? "", board.updated_at].sort().at(-1) ?? board.updated_at,
     session_started_at: sessionStartedAt,
     session_updated_at: sessionUpdatedAt,
     location_timezone: timezone,
@@ -256,6 +267,58 @@ async function fetchBoardSnapshot(
 
 function jsonRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+}
+
+interface ResolvedAssetMedia {
+  byAsset: Map<string, string>;
+  byPage: Map<string, string>;
+  pagesByAsset: Map<string, Array<{ url: string; duration_ms: number | null }>>;
+  latestCreatedAt: string | null;
+}
+
+async function resolveAssetMedia(admin: ReturnType<typeof adminClient>, workspaceId: string, assetIds: string[]): Promise<ResolvedAssetMedia> {
+  const empty: ResolvedAssetMedia = { byAsset: new Map(), byPage: new Map(), pagesByAsset: new Map(), latestCreatedAt: null };
+  if (!assetIds.length) return empty;
+  const [{ data: pages, error: pagesError }, { data: variants, error: variantsError }] = await Promise.all([
+    admin.from("asset_pages").select("id, asset_id, page_number, duration_ms").eq("workspace_id", workspaceId).in("asset_id", assetIds).order("page_number"),
+    admin.from("asset_variants").select("id, asset_id, asset_page_id, variant_type, object_path, created_at").eq("workspace_id", workspaceId).in("asset_id", assetIds),
+  ]);
+  if (pagesError) throw ApiError.internal(pagesError.message);
+  if (variantsError) throw ApiError.internal(variantsError.message);
+  empty.latestCreatedAt = (variants ?? []).map((variant) => variant.created_at).sort().at(-1) ?? null;
+  const preference = new Map(["display_1080p", "source_render", "preview", "thumbnail"].map((type, index) => [type, index]));
+  const bestByKey = new Map<string, { asset_id: string; asset_page_id: string | null; object_path: string; rank: number }>();
+  for (const variant of variants ?? []) {
+    const rank = preference.get(variant.variant_type);
+    if (rank === undefined) continue;
+    const key = variant.asset_page_id ?? `asset:${variant.asset_id}`;
+    if (!bestByKey.has(key) || rank < bestByKey.get(key)!.rank) bestByKey.set(key, { ...variant, rank });
+  }
+  await Promise.all([...bestByKey.entries()].map(async ([key, variant]) => {
+    const { data, error } = await admin.storage.from("scena-assets").createSignedUrl(variant.object_path, 3600);
+    if (error || !data?.signedUrl) return;
+    if (variant.asset_page_id) empty.byPage.set(variant.asset_page_id, data.signedUrl);
+    else empty.byAsset.set(variant.asset_id, data.signedUrl);
+    if (key.startsWith("asset:")) empty.byAsset.set(variant.asset_id, data.signedUrl);
+  }));
+  for (const page of pages ?? []) {
+    const url = empty.byPage.get(page.id);
+    if (!url) continue;
+    const list = empty.pagesByAsset.get(page.asset_id) ?? [];
+    list.push({ url, duration_ms: page.duration_ms === null ? null : Number(page.duration_ms) });
+    empty.pagesByAsset.set(page.asset_id, list);
+  }
+  return empty;
+}
+
+function resolveSceneConfig(config: Record<string, unknown>, media: ResolvedAssetMedia): Record<string, unknown> {
+  if (typeof config.asset_id !== "string") return config;
+  const pages = media.pagesByAsset.get(config.asset_id) ?? [];
+  return {
+    ...config,
+    slide_urls: pages.map((page) => page.url),
+    slide_durations_ms: pages.map((page) => page.duration_ms),
+  };
 }
 
 function resolvePath(value: unknown, path: string): unknown {

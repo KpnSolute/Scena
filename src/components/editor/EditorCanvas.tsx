@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import type { BoardScene, SceneElement, ShapeVariant } from "../../services/scena-api/boards";
 import { readBorderConfig, readMediaConfig, readShapeConfig } from "../../services/scena-api/boards";
 import { getElementRenderer, type ElementRendererProps } from "./elements";
+import { sceneTypeOf, signLayoutOf } from "../../domain/boardSceneTypes";
 
 type DragKind = "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se" | "rotate";
 
@@ -113,6 +114,18 @@ export function EditorCanvas({
         onPointerUp={endDrag}
         onClick={() => onSelect(null)}
       >
+        {sceneTypeOf(scene) === "presentation" && typeof scene.config.asset_id === "string" && assetPreviewUrls?.get(scene.config.asset_id) && (
+          <img className="scena-editor__presentation-preview" src={assetPreviewUrls.get(scene.config.asset_id)} alt="First slide preview" />
+        )}
+        {sceneTypeOf(scene) === "sign" && (
+          <div className="scena-editor__zone-layer" aria-hidden="true">
+            {signLayoutOf(scene).zones.map((zone) => (
+              <div key={zone.id} className={`scena-editor__zone scena-editor__zone--${zone.role}`} style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%` }}>
+                <span>{zone.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {snapLines.v && <div className="scena-editor__snap-line scena-editor__snap-line--v" style={{ left: "50%" }} />}
         {snapLines.h && <div className="scena-editor__snap-line scena-editor__snap-line--h" style={{ top: "50%" }} />}
 

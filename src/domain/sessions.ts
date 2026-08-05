@@ -121,6 +121,7 @@ export async function stopSession(orgId: string, sessionId: string, stoppedBy: s
 
 export interface AddScreenInput {
   screen_id: string;
+  board_id?: string | null;
   layout_id?: string | null;
   is_enabled?: boolean;
   is_primary?: boolean;
@@ -154,6 +155,7 @@ export async function addScreenToSession(orgId: string, locationId: string, sess
       location_id: locationId,
       session_id: sessionId,
       screen_id: input.screen_id,
+      board_id: input.board_id ? requireUuid(input.board_id, "board_id") : null,
       layout_id: layoutId,
       is_enabled: input.is_enabled ?? true,
       is_primary: input.is_primary ?? false,
@@ -190,11 +192,12 @@ export async function setSessionBoard(orgId: string, sessionId: string, boardId:
 export async function updateSessionScreen(
   orgId: string,
   sessionScreenId: string,
-  patch: Partial<{ layout_id: string | null; is_enabled: boolean; is_primary: boolean; screen_order: number; rotation_degrees: 0 | 90 | 180 | 270; viewport: { x: number; y: number; width: number; height: number } }>,
+  patch: Partial<{ board_id: string | null; layout_id: string | null; is_enabled: boolean; is_primary: boolean; screen_order: number; rotation_degrees: 0 | 90 | 180 | 270; viewport: { x: number; y: number; width: number; height: number } }>,
 ): Promise<SessionScreen> {
   requireUuid(orgId, "org_id");
   requireUuid(sessionScreenId, "session_screen_id");
   const update: Record<string, unknown> = {};
+  if (patch.board_id !== undefined) update.board_id = patch.board_id === null ? null : requireUuid(patch.board_id, "board_id");
   if (patch.layout_id !== undefined) update.layout_id = patch.layout_id === null ? null : requireUuid(patch.layout_id, "layout_id");
   if (patch.is_enabled !== undefined) update.is_enabled = requireBoolean(patch.is_enabled, "is_enabled");
   if (patch.is_primary !== undefined) update.is_primary = requireBoolean(patch.is_primary, "is_primary");

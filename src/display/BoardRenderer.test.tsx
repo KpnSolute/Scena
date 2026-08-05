@@ -21,6 +21,8 @@ const board: BoardData = {
   scenes: [{
     id: "scene-1",
     name: "Welcome",
+    scene_type: "canvas",
+    config: {},
     sort_order: 0,
     duration_ms: 10_000,
     transition_type: "fade",

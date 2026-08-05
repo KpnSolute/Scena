@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-08-05 — Typed Scenes and visual multi-Display control
+
+Replaced anonymous Board blocks with an explicit content model: Assets are
+reusable uploads, Elements are placed content, Scenes are timed frames, Boards
+are ordered Scene playlists, Sessions route playback, and Displays are physical
+outputs. Studio now creates Canvas, Sign, and Presentation Scenes. Sign Scenes
+offer six visible snap-zone layouts, while a ready PowerPoint or PDF is inserted
+as one Presentation Scene whose rendered pages rotate inside that Scene.
+
+Added a task-view-style live control surface to Session detail. Displays can be
+identified, dragged, arranged with duplicate/horizontal/stacked/grid presets,
+and assigned an independent Board from an output flyout. The kiosk gateway now
+uses per-output Board overrides for independent/single playback, resolves
+private Asset variants to short-lived signed URLs, rotates Presentation pages,
+and correctly scales an extended Board canvas across physical viewports.
+
+Fixed inventory action flyouts being clipped by scrollable tables by rendering
+menus in a viewport-aware portal. A Display assigned to a retained Session now
+shows that Session below its name and provides an explicit “Open control room”
+action, removing the dead end between Display inventory and live routing.
+
+Added the additive typed-Scene/per-output-routing migration and updated generated
+contracts. Verification: TypeScript and Deno checks passed, 197 tests passed,
+the production build completed with the existing large-chunk warning, and the
+local Studio preview rendered with no browser console warnings or errors.
+Production migration, gateway deployment, web deployment, and authenticated
+end-to-end acceptance remain separate release gates.
+
 ## 2026-08-05 — Display health and Session control-room refinement
 
 Connected every authenticated kiosk poll to the existing service-role-only

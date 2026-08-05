@@ -1,5 +1,6 @@
-import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cx } from "./cx";
 
 export interface MenuItemDef {
@@ -23,11 +24,13 @@ export function DropdownMenu({ trigger, items, align = "right" }: DropdownMenuPr
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!open) return;
     function onDocClick(event: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node) && !popoverRef.current?.contains(event.target as Node)) setOpen(false);
     }
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -42,6 +45,27 @@ export function DropdownMenu({ trigger, items, align = "right" }: DropdownMenuPr
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    function place() {
+      const triggerRect = triggerRef.current!.getBoundingClientRect();
+      const popoverWidth = popoverRef.current?.offsetWidth ?? 216;
+      const popoverHeight = popoverRef.current?.offsetHeight ?? items.length * 40 + 16;
+      const preferredLeft = align === "left" ? triggerRect.left : triggerRect.right - popoverWidth;
+      const left = Math.max(8, Math.min(window.innerWidth - popoverWidth - 8, preferredLeft));
+      const below = triggerRect.bottom + 8;
+      const top = below + popoverHeight <= window.innerHeight - 8 ? below : Math.max(8, triggerRect.top - popoverHeight - 8);
+      setPosition({ top, left });
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [align, items.length, open]);
 
   // The trigger is cloned in place (instead of wrapped in a focusable span) so
   // that focus, click, and ARIA state attach directly to whatever focusable
@@ -62,8 +86,8 @@ export function DropdownMenu({ trigger, items, align = "right" }: DropdownMenuPr
   return (
     <div className="scena-menu-wrap" ref={wrapRef}>
       {triggerNode}
-      {open && (
-        <div className={cx("scena-menu-popover", align === "left" && "scena-menu-popover--left")}>
+      {open && createPortal(
+        <div ref={popoverRef} className={cx("scena-menu-popover", align === "left" && "scena-menu-popover--left")} style={{ top: position.top, left: position.left }}>
           <div className="scena-menu scena-glass-medium" role="menu">
             {items.map((item) => (
               <button
@@ -83,7 +107,8 @@ export function DropdownMenu({ trigger, items, align = "right" }: DropdownMenuPr
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

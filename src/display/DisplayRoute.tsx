@@ -161,6 +161,7 @@ export function DisplayRoute() {
  * resolution end to end without investing in kiosk visual polish. */
 export function LayoutRenderer({ state }: { state: Extract<DisplayState, { status: "showing" }> }) {
   const { layout, viewport, rotation_degrees } = state;
+  const isExtendedViewport = state.display_mode === "extend" && (viewport.x !== 0 || viewport.y !== 0 || viewport.width !== 100 || viewport.height !== 100);
   return <div
     className="layout-canvas"
     style={{
@@ -170,9 +171,15 @@ export function LayoutRenderer({ state }: { state: Extract<DisplayState, { statu
       background: state.board?.background_color ?? layout?.background_color ?? "#000000",
       overflow: "hidden",
       transform: rotation_degrees ? `rotate(${rotation_degrees}deg)` : undefined,
-      clipPath: `inset(${viewport.y}% ${100 - viewport.x - viewport.width}% ${100 - viewport.y - viewport.height}% ${viewport.x}%)`,
     }}
   >
+    <div style={isExtendedViewport ? {
+      position: "absolute",
+      left: `${-100 * viewport.x / viewport.width}%`,
+      top: `${-100 * viewport.y / viewport.height}%`,
+      width: `${10_000 / viewport.width}%`,
+      height: `${10_000 / viewport.height}%`,
+    } : { position: "absolute", inset: 0 }}>
     {state.board ? <BoardRenderer board={state.board} /> : layout?.tiles.filter((t) => t.is_visible).map((tile) => (
       <div
         key={tile.id}
@@ -192,6 +199,7 @@ export function LayoutRenderer({ state }: { state: Extract<DisplayState, { statu
         <TileContent content={tile.content} />
       </div>
     ))}
+    </div>
   </div>;
 }
 

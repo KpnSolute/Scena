@@ -45,6 +45,12 @@
 .scena-editor__asset-tile { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 7px; margin-bottom: 8px; border: 1px solid var(--scena-border); border-radius: var(--scena-radius-md); background: var(--scena-surface-1); color: var(--scena-text-primary); text-align: left; font: inherit; cursor: pointer; }
 .scena-editor__asset-tile:hover { background: var(--scena-surface-hover); }
 .scena-editor__asset-tile img, .scena-editor__asset-tile-fallback { width: 64px; height: 42px; display: grid; place-items: center; border-radius: var(--scena-radius-sm); background: var(--scena-surface-3); object-fit: cover; color: var(--scena-text-muted); }
+.scena-editor__asset-tile small { display: block; margin-top: 3px; color: var(--scena-text-muted); font-size: 11px; }
+.scena-editor__scene-type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.scena-editor__scene-type-grid button { min-height: 150px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px; border: 1px solid var(--scena-border); border-radius: var(--scena-radius-lg); background: var(--scena-surface-1); color: var(--scena-text-primary); text-align: left; cursor: pointer; }
+.scena-editor__scene-type-grid button:hover { border-color: var(--scena-accent); background: var(--scena-surface-hover); transform: translateY(-1px); }
+.scena-editor__scene-type-grid button svg { color: var(--scena-accent); }
+.scena-editor__scene-type-grid button span { color: var(--scena-text-secondary); line-height: 1.45; }
 
 .scena-editor__canvas-wrap {
   flex: 1; min-width: 0; overflow: auto; display: flex; align-items: center; justify-content: center;
@@ -280,6 +286,14 @@
   background: var(--scena-surface-1); color: var(--scena-text-secondary); text-align: left;
   font-family: inherit; cursor: pointer; transition: background var(--scena-duration-normal), border-color var(--scena-duration-normal), transform var(--scena-duration-fast);
 }
+.scena-editor__presentation-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.scena-editor__zone-layer { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.scena-editor__zone { position: absolute; border: 1px dashed color-mix(in srgb, var(--scena-accent) 62%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--scena-accent) 7%, transparent); }
+.scena-editor__zone span { position: absolute; top: 6px; left: 7px; padding: 2px 6px; border-radius: 999px; background: color-mix(in srgb, var(--scena-surface-1) 88%, transparent); color: var(--scena-text-secondary); font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; }
+.scena-editor__zone--ticker { border-color: color-mix(in srgb, var(--scena-success) 65%, transparent); }
+.scena-editor__scene-type { width: fit-content; padding: 2px 6px; border-radius: 999px; background: var(--scena-surface-3); color: var(--scena-text-secondary); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.scena-editor__scene-type--sign { color: var(--scena-success); }
+.scena-editor__scene-type--presentation { color: var(--scena-accent); }
 .scena-editor__element-tile:hover { background: var(--scena-surface-hover); border-color: color-mix(in srgb, var(--scena-violet) 55%, var(--scena-border)); color: var(--scena-text-primary); transform: translateY(-1px); }
 .scena-editor__element-tile-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--scena-violet) 11%, var(--scena-surface-2)); color: var(--scena-violet); }
 .scena-editor__element-tile-copy { min-width: 0; display: grid; gap: 2px; }

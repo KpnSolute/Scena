@@ -711,11 +711,13 @@ export type Database = {
         Row: {
           background: Json
           board_id: string
+          config: Json
           created_at: string
           duration_ms: number
           id: string
           is_hidden: boolean
           name: string
+          scene_type: string
           sort_order: number
           transition_config: Json
           transition_type: string
@@ -725,11 +727,13 @@ export type Database = {
         Insert: {
           background?: Json
           board_id: string
+          config?: Json
           created_at?: string
           duration_ms?: number
           id?: string
           is_hidden?: boolean
           name: string
+          scene_type?: string
           sort_order?: number
           transition_config?: Json
           transition_type?: string
@@ -739,11 +743,13 @@ export type Database = {
         Update: {
           background?: Json
           board_id?: string
+          config?: Json
           created_at?: string
           duration_ms?: number
           id?: string
           is_hidden?: boolean
           name?: string
+          scene_type?: string
           sort_order?: number
           transition_config?: Json
           transition_type?: string
@@ -1614,6 +1620,7 @@ export type Database = {
           added_at: string
           added_by: string | null
           assignment_status: string
+          board_id: string | null
           id: string
           is_enabled: boolean
           is_primary: boolean
@@ -1636,6 +1643,7 @@ export type Database = {
           added_at?: string
           added_by?: string | null
           assignment_status?: string
+          board_id?: string | null
           id?: string
           is_enabled?: boolean
           is_primary?: boolean
@@ -1658,6 +1666,7 @@ export type Database = {
           added_at?: string
           added_by?: string | null
           assignment_status?: string
+          board_id?: string | null
           id?: string
           is_enabled?: boolean
           is_primary?: boolean
@@ -1676,6 +1685,13 @@ export type Database = {
           viewport_y_percent?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "display_session_screens_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "display_session_screens_layout_id_org_id_location_id_fkey"
             columns: ["layout_id", "org_id", "location_id"]
