@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-08-05 — Connected Content production activation
+
+Applied the Connected Content schema and deployed `content-source` and
+`display-gateway`. Fixed the browser preflight contract for `content-source`
+by allowing the Supabase `apikey` and `x-client-info` headers. The authenticated
+Connections page now reaches the production function and renders its empty
+state instead of reporting that the Scena API is unavailable.
+
+Verification: Deno check passed, 180 tests passed, the production build passed
+with the existing large-chunk warning, and the live Connections page loaded
+without console errors. KpnSolute Events gateway credentials and the first
+tenant subscription still require Cloudflare authorization.
+
 ## 2026-08-04 — KpnSolute CloudEvents Connection adapter
 
 Extended Connected Content with a first-class KpnCompute menu connection.

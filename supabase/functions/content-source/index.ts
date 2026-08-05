@@ -5,7 +5,7 @@ const MAX_BODY_BYTES = 262_144;
 const MENU_DAY_EVENT = "com.kpnsolute.compute.menu.day.updated.v1";
 const CORS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-headers": "authorization, content-type, x-scena-source-id, webhook-id, webhook-timestamp, webhook-signature",
+  "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-scena-source-id, webhook-id, webhook-timestamp, webhook-signature",
   "access-control-allow-methods": "POST, OPTIONS",
 };
 
