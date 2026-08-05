@@ -12,7 +12,7 @@ import { requireSupabase } from "../services/supabase/client";
 import { broadcastOrgInvalidation } from "../services/supabase/invalidation";
 import { mapPostgresError } from "../shared/errors";
 import { requireUuid } from "../shared/validation";
-import type { Tables } from "../shared/database.types";
+import type { Json, Tables } from "../shared/database.types";
 
 /** The ten Session lifecycle states. Mirrors display_sessions_status_check. */
 export const SESSION_STATES = [
@@ -117,10 +117,49 @@ export interface ReadinessSummary {
 }
 
 export type SessionEvent = Tables<"session_events">;
-export type DisplayHealth = Tables<"display_health">;
+export type DisplayHealth = Tables<"display_health"> & { runtime_stats?: Json };
 export type SessionHealthSummary = Tables<"session_health_summary">;
 export type EffectiveEntitlements = Tables<"workspace_effective_entitlements">;
 export type WorkspaceUsage = Tables<"workspace_usage_current">;
+
+export interface DisplayRuntimeStats {
+  fps: number | null;
+  pollLatencyMs: number | null;
+  pollErrorCount: number;
+  uptimeSeconds: number | null;
+  devicePixelRatio: number | null;
+  cpuCores: number | null;
+  deviceMemoryGb: number | null;
+  networkEffectiveType: string | null;
+  networkDownlinkMbps: number | null;
+  cacheSource: "live" | "cached" | null;
+  playerStatus: string | null;
+  contentVersion: string | null;
+}
+
+/** Safely narrows the bounded JSON written by display-gateway. */
+export function parseDisplayRuntimeStats(value: Json | undefined): DisplayRuntimeStats {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, Json | undefined>
+    : {};
+  const number = (key: string) => typeof record[key] === "number" && Number.isFinite(record[key]) ? record[key] as number : null;
+  const string = (key: string) => typeof record[key] === "string" ? record[key] as string : null;
+  const cache = string("cache_source");
+  return {
+    fps: number("fps"),
+    pollLatencyMs: number("poll_latency_ms"),
+    pollErrorCount: number("poll_error_count") ?? 0,
+    uptimeSeconds: number("uptime_seconds"),
+    devicePixelRatio: number("device_pixel_ratio"),
+    cpuCores: number("cpu_cores"),
+    deviceMemoryGb: number("device_memory_gb"),
+    networkEffectiveType: string("network_effective_type"),
+    networkDownlinkMbps: number("network_downlink_mbps"),
+    cacheSource: cache === "live" || cache === "cached" ? cache : null,
+    playerStatus: string("player_status"),
+    contentVersion: string("content_version"),
+  };
+}
 
 /**
  * The authoritative readiness checklist. Render these rows as-is; do not filter
@@ -214,7 +253,7 @@ export async function getDisplayHealth(orgId: string): Promise<Map<string, Displ
   const supabase = requireSupabase();
   const { data, error } = await supabase.from("display_health").select("*").eq("org_id", orgId);
   if (error) throw mapPostgresError(error);
-  return new Map((data ?? []).map((row) => [row.screen_id, row]));
+  return new Map(((data ?? []) as DisplayHealth[]).map((row) => [row.screen_id, row]));
 }
 
 export async function getSessionHealth(sessionId: string): Promise<SessionHealthSummary | null> {

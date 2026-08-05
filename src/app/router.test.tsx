@@ -92,7 +92,7 @@ vi.mock("../lib/display", () => ({
   storedToken: () => mockStoredToken(),
   forgetDevice: vi.fn(),
   registerDevice: () => mockRegisterDevice(),
-  pollState: () => mockPollState(),
+  pollState: (...args: unknown[]) => mockPollState(...args),
   subscribeToOrgInvalidation: () => () => {},
   readCachedDisplayState: () => null,
 }));
@@ -167,6 +167,16 @@ describe("direct navigation to nested manager routes", () => {
     renderAt("/app/screens/screen-abc-123");
     await waitFor(() => expect(screen.getByText("Display not found")).toBeInTheDocument());
   });
+
+  it("offers both remote-screen and current-device paths on Display pairing", async () => {
+    renderAt("/app/screens/pair");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Pair a Display" })).toBeInTheDocument());
+    const currentDevice = screen.getByRole("link", { name: /Open player on this device/ });
+    expect(currentDevice).toHaveAttribute("href", "/display");
+    expect(currentDevice).toHaveAttribute("target", "_blank");
+    expect(screen.getByText(`${window.location.origin}/display`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+  });
 });
 
 // ---- 404s -----------------------------------------------------------------
@@ -205,6 +215,20 @@ describe("/display", () => {
     mockPollState.mockResolvedValue({ state: { status: "standby", screen_name: "Front Counter", org_id: "org-1" }, fromCache: false });
     renderAt("/display");
     await waitFor(() => expect(screen.getByText(/standby/)).toBeInTheDocument());
+    expect(mockPollState).toHaveBeenCalledWith(expect.objectContaining({
+      cache_source: "live",
+      poll_error_count: 0,
+      uptime_seconds: expect.any(Number),
+    }));
+  });
+
+  it("keeps the player surface clean even when an old debug URL is opened", async () => {
+    mockStoredToken.mockReturnValue("existing-device-token");
+    mockPollState.mockResolvedValue({ state: { status: "standby", screen_name: "Front Counter", org_id: "org-1" }, fromCache: false });
+    renderAt("/display?debug");
+    await waitFor(() => expect(screen.getByText(/standby/)).toBeInTheDocument());
+    expect(screen.queryByText("SCENA DISPLAY DIAGNOSTICS")).not.toBeInTheDocument();
+    expect(screen.queryByText(/press D for diagnostics/i)).not.toBeInTheDocument();
   });
 });
 

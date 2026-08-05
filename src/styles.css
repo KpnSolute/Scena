@@ -9,5 +9,6 @@
 @import "./styles/auth.css";
 @import "./styles/editor.css";
 @import "./styles/layouts.css";
+@import "./styles/sessions.css";
 @import "./styles/states.css";
 @import "./styles/legacy.css";

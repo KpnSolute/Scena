@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Broadcast, Check, Monitor, PencilSimple, Play, Plus, Star, Stop, Trash, Warning, X } from "@phosphor-icons/react";
+import { ArrowLeft, Broadcast, Check, ClockCounterClockwise, Monitor, PencilSimple, Play, Plus, Star, Stop, Trash, Warning, X } from "@phosphor-icons/react";
 import { useManagerContext } from "../../app/ManagerContextProvider";
 import { canManage } from "../../auth/organization-context";
 import * as Sessions from "../../domain/sessions";
@@ -108,6 +108,19 @@ export function SessionDetailPage() {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(refresh, [context.workspace.id, sessionId]);
+
+  // The control room stays live while it is open. This is deliberately a
+  // bounded read-only poll of the one-row-per-Display health table; the kiosk
+  // continues to own playback and never receives Manager credentials.
+  useEffect(() => {
+    let active = true;
+    const interval = window.setInterval(() => {
+      Control.getDisplayHealth(context.workspace.id)
+        .then((next) => { if (active) setHealth(next); })
+        .catch(() => {});
+    }, 4000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, [context.workspace.id, sessionId]);
 
   function showError(err: unknown, fallback: string) {
     toast.show(err instanceof Error ? err.message : fallback, "danger");
@@ -331,6 +344,7 @@ export function SessionDetailPage() {
   // re-judged here.
   const blockingFailures = (readiness ?? []).filter((check) => !check.passed && check.blocking);
   const readinessWarnings = (readiness ?? []).filter((check) => !check.passed && !check.blocking);
+  const passedChecks = (readiness ?? []).filter((check) => check.passed);
   const canStart = Control.canTransition(session.status as Control.SessionState, "ready")
     || Control.canTransition(session.status as Control.SessionState, "starting")
     || session.status === "paused";
@@ -442,91 +456,38 @@ export function SessionDetailPage() {
         />
       )}
 
-      {/* Readiness. Rendered verbatim from public.session_readiness() — the UI
-          does not decide what "ready" means, and must never filter a failing
-          check out of this list. */}
-      {readiness && (
-        <Card style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>
-              Readiness
-            </div>
-            <div style={{ fontSize: "var(--scena-text-sm)", color: "var(--scena-text-muted)" }}>
-              {blockingFailures.length === 0
-                ? `All ${readiness.length} checks passed`
-                : `${blockingFailures.length} of ${readiness.length} checks must be fixed before starting`}
-            </div>
+      <section className="scena-session-summary" aria-label="Session overview">
+        <Card className={`scena-session-state scena-session-state--${session.status}`}>
+          <div className="scena-session-state__icon"><Broadcast size={24} weight="duotone" /></div>
+          <div>
+            <span className="scena-session-eyebrow">Operational state</span>
+            <strong>{Control.sessionStateLabel(session.status)}</strong>
+            <p>{session.status === "active" ? "Content is live on assigned Displays." : session.status === "stopped" ? "Playback ended and Display assignments were released." : "Session configuration is retained for the next action."}</p>
           </div>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-            {readiness.map((check) => (
-              <li
-                key={check.check_key}
-                style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "var(--scena-text-sm)" }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    flexShrink: 0,
-                    marginTop: 2,
-                    color: check.passed
-                      ? "var(--scena-success)"
-                      : check.blocking
-                        ? "var(--scena-danger)"
-                        : "var(--scena-warning)",
-                  }}
-                >
-                  {check.passed ? <Check size={16} /> : <Warning size={16} />}
-                </span>
-                <span style={{ color: check.passed ? "var(--scena-text-muted)" : "var(--scena-text)" }}>
-                  {check.message}
-                  <span className="scena-visually-hidden">
-                    {check.passed ? " — passed" : check.blocking ? " — must be fixed" : " — warning"}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          {readinessWarnings.length > 0 && blockingFailures.length === 0 && (
-            <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
-              This Session can start. Warnings above will resolve on their own once every Display reports in.
-            </div>
-          )}
+          <div className="scena-session-state__meta">
+            <span>{session.display_mode} mode</span>
+            <span>{session.started_at ? `Started ${new Date(session.started_at).toLocaleString()}` : "Not started yet"}</span>
+          </div>
         </Card>
-      )}
 
-      {/* Plan context. Numbers come from workspace_effective_entitlements and
-          workspace_usage_current, which are the same values the database
-          enforces — so this panel cannot disagree with a rejected action. */}
-      {entitlements && usage && (
-        <Card style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>
-            Plan usage
+        {entitlements && usage && (
+          <div className="scena-session-metrics">
+            <UsageMetric icon={<Monitor size={18} />} label="Displays" value={usage.displays_used ?? 0} limit={entitlements.max_displays} />
+            <UsageMetric icon={<Broadcast size={18} />} label="Boards" value={usage.boards_used ?? 0} limit={entitlements.max_boards} />
+            <UsageMetric icon={<Play size={18} />} label="Live Sessions" value={usage.active_sessions_used ?? 0} limit={entitlements.max_concurrent_sessions} />
+            <UsageMetric icon={<Monitor size={18} />} label="In this Session" value={session.screens.length} limit={entitlements.max_displays_per_session} />
           </div>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", fontSize: "var(--scena-text-sm)" }}>
-            <span>
-              Displays <strong>{usage.displays_used ?? 0}</strong> of {entitlements.max_displays}
-            </span>
-            <span>
-              Boards <strong>{usage.boards_used ?? 0}</strong> of {entitlements.max_boards}
-            </span>
-            <span>
-              Live Sessions <strong>{usage.active_sessions_used ?? 0}</strong> of {entitlements.max_concurrent_sessions}
-            </span>
-            <span>
-              Displays in this Session <strong>{session.screens.length}</strong> of {entitlements.max_displays_per_session}
-            </span>
-          </div>
-          {entitlements.has_override && (
-            <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
-              An approved limit override is active on this Workspace.
-            </div>
-          )}
-        </Card>
-      )}
+        )}
+      </section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
-        <Card style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>Display mode</div>
+      <div className="scena-session-workspace">
+        <div className="scena-session-workspace__main">
+          <div className="scena-session-config-grid">
+        <Card className="scena-session-panel scena-session-panel--mode">
+          <div className="scena-session-panel__header">
+            <div className="scena-session-panel__icon"><Monitor size={20} weight="duotone" /></div>
+            <div><span className="scena-session-eyebrow">Routing</span><h2>Display mode</h2></div>
+          </div>
           <Field label="Mode" htmlFor="session-display-mode" hint="Duplicate and extend broadcast one shared Layout to every Display; independent and single assign Layouts per Display.">
             <Select
               id="session-display-mode"
@@ -541,14 +502,17 @@ export function SessionDetailPage() {
               ]}
             />
           </Field>
-          <div style={{ fontSize: "var(--scena-text-sm)", color: "var(--scena-text-secondary)", display: "grid", gap: 6 }}>
+          <div className="scena-session-panel__facts">
             <span>Started: {session.started_at ? new Date(session.started_at).toLocaleString() : "—"}</span>
             <span>Stopped: {session.stopped_at ? new Date(session.stopped_at).toLocaleString() : "—"}</span>
           </div>
         </Card>
 
-        <Card style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>Board playback</div>
+        <Card className="scena-session-panel scena-session-panel--board">
+          <div className="scena-session-panel__header">
+            <div className="scena-session-panel__icon"><Broadcast size={20} weight="duotone" /></div>
+            <div><span className="scena-session-eyebrow">Content</span><h2>Board playback</h2></div>
+          </div>
           <Field
             label="Board"
             htmlFor="session-board"
@@ -581,11 +545,13 @@ export function SessionDetailPage() {
             </div>
           )}
         </Card>
+          </div>
 
-        <Card style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>
-              Displays ({session.screens.length})
+        <Card className="scena-session-panel scena-session-panel--displays">
+          <div className="scena-session-panel__topline">
+            <div className="scena-session-panel__header">
+              <div className="scena-session-panel__icon"><Monitor size={20} weight="duotone" /></div>
+              <div><span className="scena-session-eyebrow">Destinations</span><h2>Displays <small>{session.screens.length}</small></h2></div>
             </div>
             {composable && (
               <Button variant="secondary" size="sm" icon={<Plus size={16} />} onClick={openAdd}>
@@ -612,60 +578,73 @@ export function SessionDetailPage() {
               action={composable ? <Button variant="secondary" size="sm" icon={<Plus size={16} />} onClick={openAdd}>Add display</Button> : undefined}
             />
           ) : (
-            <div style={{ display: "grid", gap: 12 }}>
-              {session.screens.map((screen) => (
+            <div className="scena-session-output-grid">
+              {session.screens.map((screen) => {
+                const displayHealth = health.get(screen.screen_id);
+                const runtime = Control.parseDisplayRuntimeStats(displayHealth?.runtime_stats);
+                const connection = displayHealth?.connection_state ?? "unknown";
+                const resolution = displayHealth?.resolution_width && displayHealth?.resolution_height
+                  ? `${displayHealth.resolution_width}×${displayHealth.resolution_height}${runtime.devicePixelRatio ? ` @ ${runtime.devicePixelRatio}x` : ""}`
+                  : "Not reported";
+                return (
                 <div
                   key={screen.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    flexWrap: "wrap",
-                    padding: "10px 12px",
-                    background: "var(--scena-surface-2)",
-                    borderRadius: "var(--scena-radius-md)",
-                  }}
+                  className={`scena-session-output scena-session-output--${connection}`}
                 >
-                  <Monitor size={20} style={{ color: "var(--scena-text-muted)", flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 140 }}>
-                    <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                      {screenNames.get(screen.screen_id) ?? "Unknown display"}
-                      {screen.is_primary && <Star size={14} weight="fill" style={{ color: "var(--scena-text-muted)" }} aria-label="Primary" />}
-                    </div>
-                    <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
-                      Order {screen.screen_order}
-                      {screen.rotation_degrees ? ` · ${screen.rotation_degrees}°` : ""}
-                      {/* Live health from display_health. "Not reported yet"
-                          is deliberate: an absent row means the Display has
-                          never heartbeated, which is different from offline. */}
-                      {(() => {
-                        const dh = health.get(screen.screen_id);
-                        if (!dh) return " · Not reported yet";
-                        const seen = dh.last_heartbeat_at
-                          ? new Date(dh.last_heartbeat_at).toLocaleTimeString()
-                          : "never";
-                        return ` · ${dh.connection_state === "online" ? "Online" : "Offline"} (${dh.health_state}), last seen ${seen}`;
-                      })()}
-                    </div>
-                    {health.get(screen.screen_id)?.last_error_message_safe && (
-                      <div style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-danger)" }}>
-                        {health.get(screen.screen_id)?.last_error_message_safe}
+                  <header className="scena-session-output__header">
+                    <div className="scena-session-output__identity">
+                      <div className="scena-session-display__icon"><Monitor size={20} weight="duotone" /></div>
+                      <div>
+                        <span className="scena-session-eyebrow">Output {screen.screen_order}</span>
+                        <div className="scena-session-display__name">
+                          {screenNames.get(screen.screen_id) ?? "Unknown display"}
+                          {screen.is_primary && <Star size={14} weight="fill" aria-label="Primary" />}
+                        </div>
                       </div>
-                    )}
+                    </div>
+                    <div className={`scena-session-health scena-session-health--${connection}`}>
+                      <span className="scena-session-health__dot" />
+                      <div>
+                        <strong>{displayHealth ? (connection === "online" ? "LIVE" : "OFFLINE") : "WAITING"}</strong>
+                        <small>{displayHealth?.last_heartbeat_at ? new Date(displayHealth.last_heartbeat_at).toLocaleTimeString() : "No heartbeat"}</small>
+                      </div>
+                    </div>
+                  </header>
+
+                  <div className="scena-session-output__meters">
+                    <RuntimeMeter label="Render" value={runtime.fps === null ? "—" : `${Math.round(runtime.fps)} FPS`} percentage={runtime.fps === null ? 0 : Math.min(100, runtime.fps / 60 * 100)} tone={runtime.fps !== null && runtime.fps < 24 ? "danger" : "success"} />
+                    <RuntimeMeter label="Poll" value={runtime.pollLatencyMs === null ? "—" : `${Math.round(runtime.pollLatencyMs)} ms`} percentage={runtime.pollLatencyMs === null ? 0 : Math.min(100, runtime.pollLatencyMs / 20)} tone={runtime.pollLatencyMs !== null && runtime.pollLatencyMs > 2000 ? "danger" : "brand"} />
                   </div>
-                  {usesSharedLayout ? (
-                    <span style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
-                      Shared layout: {session.shared_layout_id ? (layoutNames.get(session.shared_layout_id) ?? "Unknown") : "Not set"}
-                    </span>
-                  ) : composable ? (
-                    locationLayouts === null ? (
-                      <Skeleton height={36} />
-                    ) : locationLayouts.length === 0 ? (
-                      <span style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-warning)" }}>
-                        No Layouts yet — <Link to="/app/layouts">create one</Link>
-                      </span>
-                    ) : (
-                      <div style={{ minWidth: 180 }}>
+
+                  <div className="scena-session-output__telemetry">
+                    <RuntimeDatum label="Player" value={runtime.playerStatus ?? displayHealth?.health_state ?? "Not reported"} />
+                    <RuntimeDatum label="Sync" value={displayHealth?.sync_state ?? "Not reported"} />
+                    <RuntimeDatum label="Cache" value={runtime.cacheSource ?? displayHealth?.cached_content_state ?? "Not reported"} />
+                    <RuntimeDatum label="Errors" value={String(runtime.pollErrorCount)} alert={runtime.pollErrorCount > 0} />
+                    <RuntimeDatum label="Uptime" value={formatRuntimeDuration(runtime.uptimeSeconds)} />
+                    <RuntimeDatum label="Resolution" value={resolution} />
+                    <RuntimeDatum label="Hardware" value={`${runtime.cpuCores ?? "—"} cores · ${runtime.deviceMemoryGb === null ? "—" : `≥${runtime.deviceMemoryGb} GB`}`} />
+                    <RuntimeDatum label="Network" value={runtime.networkEffectiveType ? `${runtime.networkEffectiveType}${runtime.networkDownlinkMbps === null ? "" : ` · ${runtime.networkDownlinkMbps} Mbps`}` : displayHealth?.network_quality ?? "Not reported"} />
+                  </div>
+
+                  <div className="scena-session-output__content">
+                    <span>CONTENT</span>
+                    <strong>{runtime.contentVersion ? runtime.contentVersion.slice(0, 72) : session.board_id ? "Waiting for player version" : "Legacy Layout playback"}</strong>
+                  </div>
+
+                  {displayHealth?.last_error_message_safe && (
+                    <div className="scena-session-display__error">{displayHealth.last_error_message_safe}</div>
+                  )}
+
+                  <footer className="scena-session-output__controls">
+                    <div className="scena-session-output__route">
+                    {usesSharedLayout ? (
+                      <span>Shared layout: {session.shared_layout_id ? (layoutNames.get(session.shared_layout_id) ?? "Unknown") : "Not set"}</span>
+                    ) : composable ? (
+                      locationLayouts === null ? <Skeleton height={36} /> : locationLayouts.length === 0 ? (
+                        <span>No Layouts yet — <Link to="/app/layouts">create one</Link></span>
+                      ) : (
+                      <div>
                         <Field label="Layout" htmlFor={`session-screen-layout-${screen.id}`}>
                           <Select
                             id={`session-screen-layout-${screen.id}`}
@@ -678,14 +657,11 @@ export function SessionDetailPage() {
                           />
                         </Field>
                       </div>
-                    )
-                  ) : (
-                    <span style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
-                      Layout: {screen.layout_id ? (layoutNames.get(screen.layout_id) ?? "Unknown") : "Not set"}
-                    </span>
-                  )}
-                  {composable ? (
-                    <>
+                      )
+                    ) : <span>Layout: {screen.layout_id ? (layoutNames.get(screen.layout_id) ?? "Unknown") : "Not set"}</span>}
+                    </div>
+                    <div className="scena-session-output__actions">
+                    {composable ? <>
                       <Switch checked={screen.is_enabled} onChange={() => toggleEnabled(screen)} label={screen.is_enabled ? "Enabled" : "Disabled"} />
                       {!screen.is_primary && (
                         <Button variant="ghost" size="sm" icon={<Star size={16} />} onClick={() => makePrimary(screen.id)}>
@@ -695,24 +671,22 @@ export function SessionDetailPage() {
                       <Button variant="ghost" size="sm" icon={<Trash size={16} />} onClick={() => removeScreen(screen.id)}>
                         Remove
                       </Button>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: "var(--scena-text-xs)", color: "var(--scena-text-muted)" }}>
-                      {screen.is_enabled ? "Enabled" : "Disabled"}
-                    </span>
-                  )}
+                    </> : <span>{screen.is_enabled ? "Enabled" : "Disabled"}</span>}
+                    </div>
+                  </footer>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
-      </div>
 
       {/* Activity. Read straight from session_events, which is append-only and
           has no write policy — so this timeline cannot have been edited. */}
-      <Card style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ fontSize: "var(--scena-text-xs)", textTransform: "uppercase", color: "var(--scena-text-muted)" }}>
-          Activity
+      <Card className="scena-session-panel scena-session-activity">
+        <div className="scena-session-panel__header">
+          <div className="scena-session-panel__icon"><ClockCounterClockwise size={20} weight="duotone" /></div>
+          <div><span className="scena-session-eyebrow">History</span><h2>Activity</h2></div>
         </div>
         {events === null ? (
           <Skeleton height={80} />
@@ -721,22 +695,17 @@ export function SessionDetailPage() {
             Nothing has happened on this Session yet.
           </div>
         ) : (
-          <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          <ol className="scena-session-timeline">
             {events.map((event) => (
-              <li
-                key={event.id}
-                style={{ display: "flex", gap: 12, alignItems: "baseline", fontSize: "var(--scena-text-sm)" }}
-              >
-                <time
-                  dateTime={event.occurred_at}
-                  style={{ flexShrink: 0, color: "var(--scena-text-muted)", fontSize: "var(--scena-text-xs)", minWidth: 130 }}
-                >
+              <li key={event.id}>
+                <span className="scena-session-timeline__marker" aria-hidden="true" />
+                <time dateTime={event.occurred_at}>
                   {new Date(event.occurred_at).toLocaleString()}
                 </time>
-                <span>
+                <span className="scena-session-timeline__event">
                   {Control.sessionEventLabel(event.event_type)}
                   {event.actor_type !== "user" && (
-                    <span style={{ color: "var(--scena-text-muted)" }}> · {event.actor_type}</span>
+                    <small> · {event.actor_type}</small>
                   )}
                 </span>
               </li>
@@ -744,6 +713,47 @@ export function SessionDetailPage() {
           </ol>
         )}
       </Card>
+        </div>
+
+        {/* The database remains the authority. Issues are promoted; passed
+            checks remain available in one compact disclosure instead of
+            consuming most of the page. */}
+        {readiness && (
+          <aside className="scena-session-workspace__aside">
+            <Card className={`scena-session-readiness ${blockingFailures.length ? "scena-session-readiness--blocked" : "scena-session-readiness--ready"}`}>
+              <div className="scena-session-readiness__hero">
+                <div className="scena-session-readiness__icon">
+                  {blockingFailures.length ? <Warning size={22} weight="fill" /> : <Check size={22} weight="bold" />}
+                </div>
+                <div>
+                  <span className="scena-session-eyebrow">Start checklist</span>
+                  <h2>{blockingFailures.length ? `${blockingFailures.length} change${blockingFailures.length === 1 ? "" : "s"} required` : "Ready when you are"}</h2>
+                  <p>{session.status === "stopped" ? "Stopped Sessions release their Displays. Reassign one when you want to run this Session again." : blockingFailures.length ? "Resolve these items before starting playback." : "Every required check is satisfied."}</p>
+                </div>
+              </div>
+
+              {(blockingFailures.length > 0 || readinessWarnings.length > 0) && (
+                <ul className="scena-session-readiness__issues">
+                  {[...blockingFailures, ...readinessWarnings].map((check) => (
+                    <li key={check.check_key} className={check.blocking ? "is-blocking" : "is-warning"}>
+                      <Warning size={16} aria-hidden="true" />
+                      <span>{check.message}<span className="scena-visually-hidden">{check.blocking ? " — must be fixed" : " — warning"}</span></span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <details className="scena-session-readiness__passed">
+                <summary><Check size={16} /> {passedChecks.length} checks passed</summary>
+                <ul>
+                  {passedChecks.map((check) => <li key={check.check_key}><Check size={14} /> <span>{check.message}</span></li>)}
+                </ul>
+              </details>
+              {entitlements?.has_override && <div className="scena-session-readiness__override">An approved Workspace limit override is active.</div>}
+            </Card>
+          </aside>
+        )}
+      </div>
 
       <Modal
         open={addOpen}
@@ -859,4 +869,45 @@ export function SessionDetailPage() {
       />
     </div>
   );
+}
+
+function UsageMetric({ icon, label, value, limit }: { icon: ReactNode; label: string; value: number; limit: number | null }) {
+  const percentage = limit && limit > 0 ? Math.min(100, Math.round((value / limit) * 100)) : 0;
+  const limitLabel = limit ?? "Unlimited";
+  return (
+    <Card className="scena-session-metric">
+      <div className="scena-session-metric__icon">{icon}</div>
+      <div className="scena-session-metric__copy"><span>{label}</span><strong>{value}<small> / {limitLabel}</small></strong></div>
+      <div className="scena-session-metric__track" aria-label={`${label}: ${value} of ${limitLabel}`}><span style={{ width: `${percentage}%` }} /></div>
+    </Card>
+  );
+}
+
+function RuntimeMeter({ label, value, percentage, tone }: { label: string; value: string; percentage: number; tone: "success" | "brand" | "danger" }) {
+  return (
+    <div className={`scena-runtime-meter scena-runtime-meter--${tone}`}>
+      <div><span>{label}</span><strong>{value}</strong></div>
+      <div className="scena-runtime-meter__rail" aria-label={`${label}: ${value}`}>
+        <span style={{ width: `${Math.max(0, Math.min(100, percentage))}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function RuntimeDatum({ label, value, alert = false }: { label: string; value: string; alert?: boolean }) {
+  return (
+    <div className={`scena-runtime-datum${alert ? " is-alert" : ""}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function formatRuntimeDuration(seconds: number | null): string {
+  if (seconds === null) return "Not reported";
+  const whole = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const remainder = whole % 60;
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m ${remainder}s`;
 }

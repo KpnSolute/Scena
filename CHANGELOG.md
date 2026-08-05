@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-08-05 — Display health and Session control-room refinement
+
+Connected every authenticated kiosk poll to the existing service-role-only
+`ingest_display_heartbeat` control plane so `display_health`, Session readiness,
+and Manager telemetry report the same live Display state. Player polls now add
+bounded resolution, orientation, and network-quality diagnostics without
+trusting device-supplied tenant or Session identifiers.
+
+Rebuilt Session detail as a compact operational control room: distinct state
+and quota instruments, focused routing and Board controls, first-class Display
+health, a collapsible passed-check list, and a readable event timeline. Display
+pairing now shows the exact player URL and offers a dedicated “use this device”
+path that opens the kiosk in a new tab while preserving the setup form.
+
+Moved player diagnostics off the public kiosk surface and into OBS-style live
+output monitors in the Session control room. Each assigned Display now reports
+bounded FPS, poll latency/errors, uptime, resolution/DPR, hardware, network,
+cache, sync, and content-version signals through the authenticated gateway;
+the control room refreshes those instruments every four seconds. Legacy
+`?debug` player URLs now remain playback-only and device credentials are never
+returned to the Manager UI.
+
+Verification: TypeScript and Deno checks passed, 190 tests passed, and the
+production build completed with the existing large-chunk warning. Production
+database migration, Edge Function/web deployment, and live heartbeat/UI
+acceptance still require release approval.
+
 ## 2026-08-05 — Complete Session lifecycle and Display playback repair
 
 Replaced the legacy direct Session status writes with the authoritative staged

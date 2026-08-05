@@ -3,15 +3,16 @@
 // src/main.tsx before the router mounts).
 //
 // Relocated from src/Display.tsx during the routing pass — every line of
-// logic below is unchanged: device registration, pairing state, polling,
-// offline cache, invalidation subscription, layout/tile rendering, debug
-// overlay. Isolated from the manager route tree by construction: this
+// logic below includes device registration, pairing state, polling, offline
+// cache, invalidation subscription, layout/tile rendering, and bounded runtime
+// telemetry. Diagnostics render in the Manager control room, never over
+// customer content. Isolated from the manager route tree by construction: this
 // file imports only from src/lib/display.ts, never from src/auth/* or
 // src/app/* — the kiosk holds no Supabase session and no manager
 // JWT, ever.
 
 import { useEffect, useRef, useState } from "react";
-import { forgetDevice, pollState, registerDevice, storedToken, subscribeToOrgInvalidation, type DisplayState } from "../lib/display";
+import { pollState, registerDevice, storedToken, subscribeToOrgInvalidation, type DisplayPollMetrics, type DisplayState } from "../lib/display";
 import { ScenaMark } from "../components/brand/ScenaMark";
 import { BoardRenderer } from "./BoardRenderer";
 
@@ -32,9 +33,16 @@ export function DisplayRoute() {
   const [pairCode, setPairCode] = useState<string | null>(null);
   const [pollError, setPollError] = useState(0);
   const [fromCache, setFromCache] = useState(false);
-  const [lastPoll, setLastPoll] = useState<{ at: number; ms: number } | null>(null);
-  const [debug, setDebug] = useState(() => new URLSearchParams(window.location.search).has("debug"));
   const registering = useRef(false);
+  const bootedAt = useRef(Date.now());
+  const runtime = useRef<DisplayPollMetrics>({ poll_error_count: 0, cache_source: "live" });
+
+  function runtimeSnapshot(): DisplayPollMetrics {
+    return {
+      ...runtime.current,
+      uptime_seconds: Math.max(0, Math.round((Date.now() - bootedAt.current) / 1000)),
+    };
+  }
 
   async function ensureRegistered() {
     if (registering.current) return;
@@ -56,11 +64,13 @@ export function DisplayRoute() {
       if (!storedToken()) { await ensureRegistered(); return; }
       const started = performance.now();
       try {
-        const { state: next, fromCache: cached } = await pollState();
+        const { state: next, fromCache: cached } = await pollState(runtimeSnapshot());
         if (!active) return;
-        setLastPoll({ at: Date.now(), ms: Math.round(performance.now() - started) });
+        runtime.current.poll_latency_ms = Math.round(performance.now() - started);
+        runtime.current.poll_error_count = cached ? (runtime.current.poll_error_count ?? 0) + 1 : 0;
+        runtime.current.cache_source = cached ? "cached" : "live";
         setFromCache(cached);
-        setPollError(cached ? (n) => n + 1 : 0);
+        setPollError(runtime.current.poll_error_count);
         if (next.status === "unknown_device" || next.status === "revoked") {
           setPairCode(null);
           setState(next);
@@ -69,12 +79,31 @@ export function DisplayRoute() {
         }
         setState(next);
       } catch {
-        if (active) setPollError((n) => n + 1);
+        runtime.current.poll_error_count = (runtime.current.poll_error_count ?? 0) + 1;
+        runtime.current.cache_source = "cached";
+        if (active) setPollError(runtime.current.poll_error_count);
       }
     }
     tick();
     const iv = setInterval(tick, POLL_MS);
     return () => { active = false; clearInterval(iv); };
+  }, []);
+
+  useEffect(() => {
+    let frames = 0;
+    let last = performance.now();
+    let raf = 0;
+    const measure = (time: number) => {
+      frames += 1;
+      if (time - last >= 1000) {
+        runtime.current.fps = Math.round((frames * 1000) / (time - last));
+        frames = 0;
+        last = time;
+      }
+      raf = requestAnimationFrame(measure);
+    };
+    raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Realtime hint: subscribed to the screen's org-scoped invalidation
@@ -91,15 +120,20 @@ export function DisplayRoute() {
   useEffect(() => {
     if (!orgId) return;
     return subscribeToOrgInvalidation(orgId, () => {
-      pollState().then(({ state: s, fromCache: cached }) => { setState(s); setFromCache(cached); }).catch(() => {});
+      const started = performance.now();
+      pollState(runtimeSnapshot()).then(({ state: s, fromCache: cached }) => {
+        runtime.current.poll_latency_ms = Math.round(performance.now() - started);
+        runtime.current.poll_error_count = cached ? (runtime.current.poll_error_count ?? 0) + 1 : 0;
+        runtime.current.cache_source = cached ? "cached" : "live";
+        setPollError(runtime.current.poll_error_count);
+        setState(s);
+        setFromCache(cached);
+      }).catch(() => {
+        runtime.current.poll_error_count = (runtime.current.poll_error_count ?? 0) + 1;
+        setPollError(runtime.current.poll_error_count);
+      });
     });
   }, [orgId]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key.toLowerCase() === "d") setDebug((d) => !d); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   const offline = pollError >= 3;
 
@@ -120,8 +154,6 @@ export function DisplayRoute() {
           </> : <p className="display-dim">Connecting…</p>}
         </div>}
     {offline && <div className="display-offline">{fromCache ? "Reconnecting — showing cached content" : "Reconnecting…"}</div>}
-    {debug && <DebugOverlay state={state} lastPoll={lastPoll} pollError={pollError} fromCache={fromCache} />}
-    {!debug && <div className="debug-hint">press D for diagnostics</div>}
   </div>;
 }
 
@@ -181,46 +213,4 @@ function TileContent({ content }: { content: unknown }) {
     return <div>Presentation ready — {c.slide_count} slide{c.slide_count === 1 ? "" : "s"} (manifest {c.manifest_key})</div>;
   }
   return null;
-}
-
-function DebugOverlay({ state, lastPoll, pollError, fromCache }: { state: DisplayState | null; lastPoll: { at: number; ms: number } | null; pollError: number; fromCache: boolean }) {
-  const [fps, setFps] = useState(0);
-  const [now, setNow] = useState(Date.now());
-  const bootedAt = useRef(Date.now());
-
-  useEffect(() => {
-    let frames = 0, last = performance.now(), raf = 0;
-    const loop = (t: number) => {
-      frames++;
-      if (t - last >= 1000) { setFps(Math.round(frames * 1000 / (t - last))); frames = 0; last = t; }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    const iv = setInterval(() => setNow(Date.now()), 1000);
-    return () => { cancelAnimationFrame(raf); clearInterval(iv); };
-  }, []);
-
-  const nav = navigator as Navigator & { deviceMemory?: number; connection?: { effectiveType?: string; downlink?: number } };
-  const token = storedToken();
-  const pollAge = lastPoll ? Math.round((now - lastPoll.at) / 1000) : null;
-  const uptime = Math.round((now - bootedAt.current) / 1000);
-  const rows: Array<[string, string]> = [
-    ["fps", String(fps)],
-    ["status", state?.status ?? "booting"],
-    ["mode", state?.status === "showing" ? state.display_mode : "—"],
-    ["content version", state?.status === "showing" ? state.content_version.slice(0, 24) + "…" : "—"],
-    ["cache", fromCache ? "SERVING CACHED STATE" : "live"],
-    ["poll", lastPoll ? `${lastPoll.ms}ms · ${pollAge}s ago` : "—"],
-    ["poll errors", String(pollError)],
-    ["uptime", `${Math.floor(uptime / 60)}m ${uptime % 60}s`],
-    ["resolution", `${window.screen.width}×${window.screen.height} @ ${window.devicePixelRatio}x`],
-    ["cpu cores", String(navigator.hardwareConcurrency ?? "?")],
-    ["memory", nav.deviceMemory ? `≥${nav.deviceMemory} GB` : "n/a"],
-    ["network", nav.connection ? `${nav.connection.effectiveType ?? "?"} · ${nav.connection.downlink ?? "?"} Mbps` : navigator.onLine ? "online" : "offline"],
-    ["device token", token ? `…${token.slice(-8)}` : "none"],
-  ];
-  return <div className="debug-overlay">
-    <div className="debug-title">SCENA DISPLAY DIAGNOSTICS</div>
-    {rows.map(([k, v]) => <div className="debug-row" key={k}><span>{k}</span><b>{v}</b></div>)}
-  </div>;
 }

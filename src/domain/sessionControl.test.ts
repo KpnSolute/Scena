@@ -3,12 +3,40 @@ import {
   SESSION_STATES,
   canTransition,
   holdsDisplays,
+  parseDisplayRuntimeStats,
   sessionEventLabel,
   sessionStateLabel,
   startTransitionPath,
   stopTransitionPath,
   type SessionState,
 } from "./sessionControl";
+
+describe("Display runtime telemetry", () => {
+  it("parses the bounded gateway payload without trusting arbitrary JSON", () => {
+    expect(parseDisplayRuntimeStats({
+      fps: 59.8,
+      poll_latency_ms: 412,
+      poll_error_count: 0,
+      uptime_seconds: 125,
+      cache_source: "live",
+      network_effective_type: "4g",
+      content_version: "board:1:7",
+    })).toMatchObject({
+      fps: 59.8,
+      pollLatencyMs: 412,
+      pollErrorCount: 0,
+      uptimeSeconds: 125,
+      cacheSource: "live",
+      networkEffectiveType: "4g",
+      contentVersion: "board:1:7",
+    });
+  });
+
+  it("falls back cleanly for old or malformed health rows", () => {
+    expect(parseDisplayRuntimeStats(undefined)).toMatchObject({ fps: null, pollErrorCount: 0, cacheSource: null });
+    expect(parseDisplayRuntimeStats(["not", "an", "object"])).toMatchObject({ fps: null, pollLatencyMs: null });
+  });
+});
 
 /**
  * These tests guard the agreement between the client-side transition table and

@@ -107,3 +107,15 @@ describe("subscribeToOrgInvalidation", () => {
     expect(fakeChannels.size).toBe(2);
   });
 });
+
+describe("networkQuality", () => {
+  it("normalizes browser connection hints to the database health contract", async () => {
+    const { networkQuality } = await import("./display");
+    expect(networkQuality("4g")).toBe("good");
+    expect(networkQuality("3g")).toBe("fair");
+    expect(networkQuality("2g")).toBe("poor");
+    expect(networkQuality("slow-2g")).toBe("poor");
+    expect(networkQuality(undefined)).toBeNull();
+    expect(networkQuality("wifi")).toBeNull();
+  });
+});

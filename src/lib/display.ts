@@ -16,6 +16,19 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const TOKEN_KEY = "scena_display_token";
 const CACHE_KEY = "scena_display_cache";
 
+type NavigatorWithConnection = Navigator & {
+  deviceMemory?: number;
+  connection?: { effectiveType?: string; downlink?: number };
+};
+
+export interface DisplayPollMetrics {
+  fps?: number | null;
+  poll_latency_ms?: number | null;
+  poll_error_count?: number;
+  uptime_seconds?: number;
+  cache_source?: "live" | "cached";
+}
+
 // org_id rides along on every "pending"/"standby"/"showing" response (see
 // display-gateway/index.ts) so the kiosk knows which invalidation
 // broadcast channel to join — it's never used to trust org-scoped data,
@@ -79,11 +92,24 @@ function writeCache(state: DisplayState) {
  * a kiosk that briefly loses connectivity keeps rendering what it already
  * had — never a blank screen or a browser error page.
  */
-export async function pollState(): Promise<{ state: DisplayState; fromCache: boolean }> {
+export async function pollState(metrics: DisplayPollMetrics = {}): Promise<{ state: DisplayState; fromCache: boolean }> {
   const token = storedToken();
   if (!token) return { state: { status: "unknown_device" }, fromCache: false };
   try {
-    const state = await gateway<DisplayState>("display-gateway", { device_token: token });
+    const nav = navigator as NavigatorWithConnection;
+    const state = await gateway<DisplayState>("display-gateway", {
+      ...metrics,
+      device_token: token,
+      resolution_width: Math.round(window.screen.width * window.devicePixelRatio),
+      resolution_height: Math.round(window.screen.height * window.devicePixelRatio),
+      orientation: window.innerWidth >= window.innerHeight ? "landscape" : "portrait",
+      device_pixel_ratio: window.devicePixelRatio,
+      cpu_cores: navigator.hardwareConcurrency,
+      device_memory_gb: nav.deviceMemory,
+      network_effective_type: nav.connection?.effectiveType,
+      network_downlink_mbps: nav.connection?.downlink,
+      network_quality: networkQuality(nav.connection?.effectiveType),
+    });
     if (state.status === "unknown_device" || state.status === "revoked") forgetDevice();
     else writeCache(state);
     return { state, fromCache: false };
@@ -92,6 +118,13 @@ export async function pollState(): Promise<{ state: DisplayState; fromCache: boo
     if (cached) return { state: cached, fromCache: true };
     throw err;
   }
+}
+
+export function networkQuality(effectiveType: string | undefined): "good" | "fair" | "poor" | null {
+  if (effectiveType === "4g") return "good";
+  if (effectiveType === "3g") return "fair";
+  if (effectiveType === "2g" || effectiveType === "slow-2g") return "poor";
+  return null;
 }
 
 /**

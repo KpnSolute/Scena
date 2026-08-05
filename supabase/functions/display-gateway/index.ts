@@ -33,8 +33,6 @@ serveJson(async (req) => {
   if (!screen) throw new ApiError("DEVICE_CREDENTIAL_INVALID", "Unrecognized device.", 401);
   if (screen.status === "revoked" || screen.revoked_at) throw new ApiError("SCREEN_REVOKED", "This screen's credential has been revoked.", 403);
 
-  await admin.from("screens").update({ last_seen_at: new Date().toISOString() }).eq("id", screen.id);
-
   if (screen.status === "pairing") return json({ status: "pending", screen_name: screen.name }, 200);
 
   // org_id lets the kiosk join its org's `org:{orgId}` invalidation
@@ -55,7 +53,7 @@ serveJson(async (req) => {
   if (sessionScreen) {
     const { data: sessionRow, error: sessionError } = await admin
       .from("display_sessions")
-      .select("id, name, status, display_mode, shared_layout_id, board_id, location_id, started_at, updated_at")
+      .select("id, name, status, display_mode, shared_layout_id, board_id, location_id, started_at, config_revision, updated_at")
       .eq("id", sessionScreen.session_id)
       .maybeSingle();
     if (sessionError) throw ApiError.internal(sessionError.message);
@@ -79,8 +77,78 @@ serveJson(async (req) => {
   const boardResolved = board && session && sessionScreen?.is_enabled
     ? resolveBoardDisplayState(screen.name, session, sessionScreen as SessionScreenData, board)
     : resolved;
+
+  // display_health is the control-plane source used by Session readiness and
+  // Manager telemetry. The device never writes it directly: this service-role
+  // call resolves org ownership from the authenticated screen row and upserts
+  // on display_health.screen_id through the existing SECURITY DEFINER RPC.
+  const { error: heartbeatError } = await admin.rpc("ingest_display_heartbeat", {
+    target_screen_id: screen.id,
+    target_player_version: boundedText(body.player_version, 64),
+    target_resolution_width: positiveInteger(body.resolution_width),
+    target_resolution_height: positiveInteger(body.resolution_height),
+    target_orientation: enumValue(body.orientation, ["landscape", "portrait"]),
+    target_session_id: session?.id ?? null,
+    target_board_id: boardId,
+    target_config_revision: (session as SessionData & { config_revision?: number | null } | null)?.config_revision ?? null,
+    target_sync_state: board || layout ? "in_sync" : "unknown",
+    target_cached_content_state: board || layout ? "fresh" : "absent",
+    target_network_quality: enumValue(body.network_quality, ["good", "fair", "poor"]),
+    target_error_code: null,
+    target_error_message_safe: null,
+  });
+  // Telemetry degradation must be visible in Edge logs without blanking a
+  // Display that already has a valid playback response.
+  if (heartbeatError) console.error("display-heartbeat ingestion failed", heartbeatError.code ?? "unknown");
+
+  // Runtime measurements are written only after the service-role heartbeat
+  // has authenticated the device and resolved its tenant-owned screen row.
+  // Content identity comes from the server response, never from the player.
+  if (!heartbeatError) {
+    const { error: runtimeError } = await admin
+      .from("display_health")
+      .update({ runtime_stats: displayRuntimeStats(body, boardResolved) })
+      .eq("screen_id", screen.id);
+    if (runtimeError) console.error("display-runtime ingestion failed", runtimeError.code ?? "unknown");
+  }
+
   return json({ ...boardResolved, org_id: screen.org_id, ...(board ? { board } : {}) }, 200);
 }, ["POST"]);
+
+function boundedText(value: unknown, maxLength: number): string | null {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, maxLength) : null;
+}
+
+function positiveInteger(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 16384 ? value : null;
+}
+
+function enumValue<const T extends string>(value: unknown, allowed: readonly T[]): T | null {
+  return typeof value === "string" && allowed.includes(value as T) ? value as T : null;
+}
+
+function boundedNumber(value: unknown, minimum: number, maximum: number, decimals = 0): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) return null;
+  const scale = 10 ** decimals;
+  return Math.round(value * scale) / scale;
+}
+
+function displayRuntimeStats(body: Record<string, unknown>, state: { status: string; content_version?: string }) {
+  return {
+    fps: boundedNumber(body.fps, 0, 240, 1),
+    poll_latency_ms: boundedNumber(body.poll_latency_ms, 0, 120_000),
+    poll_error_count: boundedNumber(body.poll_error_count, 0, 1_000_000),
+    uptime_seconds: boundedNumber(body.uptime_seconds, 0, 31_536_000),
+    device_pixel_ratio: boundedNumber(body.device_pixel_ratio, 0.25, 8, 2),
+    cpu_cores: boundedNumber(body.cpu_cores, 1, 512),
+    device_memory_gb: boundedNumber(body.device_memory_gb, 0.25, 2048, 1),
+    network_effective_type: boundedText(body.network_effective_type, 20),
+    network_downlink_mbps: boundedNumber(body.network_downlink_mbps, 0, 100_000, 2),
+    cache_source: enumValue(body.cache_source, ["live", "cached"]),
+    player_status: state.status,
+    content_version: boundedText(state.content_version, 200),
+  };
+}
 
 function resolveBoardDisplayState(screenName: string, session: SessionData, sessionScreen: SessionScreenData, board: BoardData) {
   const viewport = session.display_mode === "extend"
