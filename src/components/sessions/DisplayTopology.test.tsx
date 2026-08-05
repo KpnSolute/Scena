@@ -31,7 +31,8 @@ describe("DisplayTopology", () => {
     fireEvent.click(screen.getByRole("button", { name: "Horizontal" }));
     expect(onViewport).toHaveBeenCalledTimes(2);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Board for Counter" }), { target: { value: "board-1" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Board for Counter" }));
+    fireEvent.click(screen.getByRole("option", { name: "Cafe menu" }));
     expect(onBoard).toHaveBeenCalledWith("session-screen-0", "board-1");
   });
 });

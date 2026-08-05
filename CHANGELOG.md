@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-08-05 — Board-first Session routing and dropdown refinement
+
+Replaced the new-Session wizard's empty legacy Layout selectors with visual
+Board choices. Duplicate and extend now select one shared Board; single and
+independent assign a Board to each Display, with the first assignment retained
+as the Session fallback. Workspaces without an active Board receive a direct,
+truthful path to create one instead of an empty dropdown and disabled Continue
+button.
+
+Made each available Display row a single large selection target. The visible
+checkbox is gone; tapping anywhere on the row now toggles it, with pressed,
+hover, keyboard-focus, and selected styling carried by the row itself.
+
+Rebuilt the shared Select control as an accessible rounded combobox with a
+viewport-aware floating list, selected-state indicator, outside-click closing,
+and complete keyboard navigation. This removes the inconsistent browser-native
+boxed menus across Manager and Studio surfaces.
+
+Added the additive Board-first Session constraint migration while preserving
+legacy Layout-backed Sessions. The database migration is live. Verification:
+TypeScript, production build, and the complete automated test suite pass. Web
+deployment and authenticated live acceptance remain separate production gates.
+
 ## 2026-08-05 — Typed Scenes and visual multi-Display control
 
 Replaced anonymous Board blocks with an explicit content model: Assets are

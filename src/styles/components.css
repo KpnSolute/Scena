@@ -59,19 +59,52 @@
 .scena-field__hint { font-size: var(--scena-text-xs); color: var(--scena-text-muted); }
 .scena-field__error { font-size: var(--scena-text-xs); color: var(--scena-danger); display: flex; align-items: center; gap: var(--scena-space-1); }
 
-.scena-input, .scena-textarea, .scena-select {
+.scena-input, .scena-textarea {
   width: 100%; height: 40px; padding: 0 var(--scena-space-4);
   background: var(--scena-surface-1); border: 1px solid var(--scena-border);
   border-radius: var(--scena-radius-md); color: var(--scena-text-primary); font-size: var(--scena-text-sm);
   transition: border-color var(--scena-duration-normal), box-shadow var(--scena-duration-normal);
 }
 .scena-input::placeholder, .scena-textarea::placeholder { color: var(--scena-text-muted); }
-.scena-input:focus-visible, .scena-textarea:focus-visible, .scena-select:focus-visible {
+.scena-input:focus-visible, .scena-textarea:focus-visible {
   border-color: var(--scena-violet); box-shadow: var(--scena-focus-ring);
 }
 .scena-input--error, .scena-textarea--error { border-color: var(--scena-danger); }
 .scena-textarea { height: auto; min-height: 96px; padding: var(--scena-space-3) var(--scena-space-4); resize: vertical; }
-.scena-select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--scena-text-muted) 50%), linear-gradient(135deg, var(--scena-text-muted) 50%, transparent 50%); background-position: calc(100% - 20px) center, calc(100% - 15px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: var(--scena-space-8); }
+.scena-select-shell { display: block; width: 100%; }
+.scena-select {
+  width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: var(--scena-space-3);
+  padding: 0 var(--scena-space-4); border: 0; border-radius: var(--scena-radius-pill);
+  background: color-mix(in srgb, var(--scena-surface-2) 88%, transparent); color: var(--scena-text-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--scena-border) 64%, transparent);
+  font: inherit; font-size: var(--scena-text-sm); text-align: left; cursor: pointer;
+  transition: background var(--scena-duration-fast), box-shadow var(--scena-duration-fast), transform var(--scena-duration-fast);
+}
+.scena-select:hover:not(:disabled) { background: var(--scena-surface-hover); }
+.scena-select:focus-visible, .scena-select[data-open="true"] { box-shadow: var(--scena-focus-ring); }
+.scena-select[data-open="true"] .scena-select__caret { transform: rotate(180deg); }
+.scena-select[data-placeholder="true"] { color: var(--scena-text-muted); }
+.scena-select:disabled { opacity: .48; cursor: not-allowed; }
+.scena-select > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scena-select__caret { flex: 0 0 auto; color: var(--scena-text-muted); transition: transform var(--scena-duration-fast); }
+.scena-select-popover {
+  position: fixed; z-index: 240; overflow-y: auto; padding: 7px;
+  border: 1px solid var(--scena-border); border-radius: var(--scena-radius-xl);
+  background: color-mix(in srgb, var(--scena-surface-1) 94%, transparent);
+  box-shadow: var(--scena-shadow-xl); backdrop-filter: blur(18px) saturate(145%);
+  animation: scena-select-in var(--scena-duration-fast) var(--scena-ease-emphasized);
+}
+@keyframes scena-select-in { from { opacity: 0; transform: translateY(-4px) scale(.99); } to { opacity: 1; transform: none; } }
+.scena-select-option {
+  width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: var(--scena-space-3);
+  padding: 9px 12px; border: 0; border-radius: var(--scena-radius-lg); background: transparent;
+  color: var(--scena-text-secondary); font: inherit; font-size: var(--scena-text-sm); text-align: left; cursor: pointer;
+}
+.scena-select-option svg { opacity: 0; color: var(--scena-accent); flex: 0 0 auto; }
+.scena-select-option:hover:not(:disabled), .scena-select-option:focus-visible { background: var(--scena-surface-hover); color: var(--scena-text-primary); outline: none; }
+.scena-select-option[data-selected="true"] { background: color-mix(in srgb, var(--scena-accent) 13%, transparent); color: var(--scena-text-primary); font-weight: 650; }
+.scena-select-option[data-selected="true"] svg { opacity: 1; }
+.scena-select-option:disabled { opacity: .4; cursor: not-allowed; }
 
 .scena-search {
   position: relative; display: flex; align-items: center;

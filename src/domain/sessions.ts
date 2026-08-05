@@ -76,16 +76,15 @@ export async function deleteDraftSession(orgId: string, sessionId: string): Prom
   if (error) throw mapPostgresError(error);
 }
 
-/** duplicate/extend require a shared_layout_id; independent/single forbid
- * one — the display_sessions_check constraint enforces this, we just
- * surface a clear error before the round-trip. */
+/** Board-first Sessions may leave shared_layout_id null in every mode. Legacy
+ * duplicate/extend Sessions can still supply one while old content is retired. */
 export async function setDisplayMode(orgId: string, sessionId: string, mode: DisplayMode, sharedLayoutId: string | null): Promise<DisplaySession> {
   requireUuid(orgId, "org_id");
   requireUuid(sessionId, "session_id");
   requireDisplayMode(mode);
-  const needsSharedLayout = mode === "duplicate" || mode === "extend";
-  if (needsSharedLayout && !sharedLayoutId) throw ApiError.validation(`${mode} mode requires a shared layout.`, { field: "shared_layout_id" });
-  if (!needsSharedLayout && sharedLayoutId) throw ApiError.validation(`${mode} mode does not use a shared layout.`, { field: "shared_layout_id" });
+  if ((mode === "independent" || mode === "single") && sharedLayoutId) {
+    throw ApiError.validation(`${mode} mode does not use a shared Layout.`, { field: "shared_layout_id" });
+  }
   const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("display_sessions")

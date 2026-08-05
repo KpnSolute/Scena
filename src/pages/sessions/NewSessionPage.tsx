@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Monitor, Play, Sparkle } from "@phosphor-icons/react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Broadcast, Check, Monitor, Play, Sparkle } from "@phosphor-icons/react";
+import { Link, useNavigate } from "react-router-dom";
 import { useManagerContext } from "../../app/ManagerContextProvider";
 import * as Locations from "../../domain/locations";
 import * as Screens from "../../domain/screens";
 import * as Sessions from "../../domain/sessions";
-import * as Layouts from "../../domain/layouts";
 import * as Boards from "../../services/scena-api/boards";
 import type { DisplayMode } from "../../shared/validation";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -15,14 +14,18 @@ import { Select } from "../../components/ui/Select";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { ErrorBanner } from "../../components/ui/ErrorBanner";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { Skeleton } from "../../components/ui/Skeleton";
+import { DisplaySelectionOption } from "../../components/sessions/DisplaySelectionOption";
+import { BoardChoiceGrid } from "../../components/sessions/BoardChoiceGrid";
+import { buildSessionBoardPlan } from "./sessionBoardPlan";
 
 const STEPS = ["Basics", "Displays", "Behavior", "Review & launch"];
 const MODES: Array<{ value: DisplayMode; title: string; description: string }> = [
-  { value: "single", title: "Single", description: "Use one enabled display for this session." },
-  { value: "duplicate", title: "Duplicate", description: "Show one shared layout on every display." },
-  { value: "extend", title: "Extend", description: "Use one shared layout across a larger canvas." },
-  { value: "independent", title: "Independent", description: "Give each display its own layout." },
+  { value: "single", title: "Single", description: "Use one enabled Display for this Session." },
+  { value: "duplicate", title: "Duplicate", description: "Show one shared Board on every Display." },
+  { value: "extend", title: "Extend", description: "Stretch one shared Board across a larger canvas." },
+  { value: "independent", title: "Independent", description: "Give each Display its own Board." },
 ];
 
 export function NewSessionPage() {
@@ -32,14 +35,12 @@ export function NewSessionPage() {
   const [locations, setLocations] = useState<Locations.Location[]>([]);
   const [locationId, setLocationId] = useState("");
   const [availableScreens, setAvailableScreens] = useState<Screens.Screen[] | null>(null);
-  const [layouts, setLayouts] = useState<Layouts.Layout[] | null>(null);
   const [boards, setBoards] = useState<Boards.BoardSummary[] | null>(null);
   const [name, setName] = useState("");
   const [selectedScreenIds, setSelectedScreenIds] = useState<string[]>([]);
-  const [screenLayouts, setScreenLayouts] = useState<Record<string, string>>({});
+  const [screenBoards, setScreenBoards] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<DisplayMode>("single");
-  const [sharedLayoutId, setSharedLayoutId] = useState("");
-  const [boardId, setBoardId] = useState("");
+  const [sharedBoardId, setSharedBoardId] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [submitting, setSubmitting] = useState(false);
   const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
@@ -60,24 +61,20 @@ export function NewSessionPage() {
   useEffect(() => {
     if (!locationId) return;
     setAvailableScreens(null);
-    setLayouts(null);
     setSelectedScreenIds([]);
-    setScreenLayouts({});
-    Promise.all([
-      Screens.listAvailableScreens(context.workspace.id, locationId),
-      Layouts.listLayouts(context.workspace.id, locationId),
-    ]).then(([screenRows, layoutRows]) => {
-      setAvailableScreens(screenRows);
-      setLayouts(layoutRows);
-    }).catch(setError);
+    setScreenBoards({});
+    Screens.listAvailableScreens(context.workspace.id, locationId)
+      .then(setAvailableScreens)
+      .catch(setError);
   }, [context.workspace.id, locationId]);
 
   const selectedScreens = useMemo(
     () => (availableScreens ?? []).filter((screen) => selectedScreenIds.includes(screen.id)),
     [availableScreens, selectedScreenIds],
   );
-  const needsSharedLayout = mode === "duplicate" || mode === "extend";
-  const needsPerScreenLayouts = mode === "single" || mode === "independent";
+  const activeBoards = useMemo(() => (boards ?? []).filter((board) => board.status === "active"), [boards]);
+  const needsSharedBoard = mode === "duplicate" || mode === "extend";
+  const needsPerScreenBoards = mode === "single" || mode === "independent";
 
   function toggleScreen(screenId: string) {
     setSelectedScreenIds((current) => current.includes(screenId)
@@ -89,9 +86,9 @@ export function NewSessionPage() {
     if (step === 0) return Boolean(locationId && name.trim());
     if (step === 1) return selectedScreenIds.length > 0;
     if (step === 2) {
-      if (needsSharedLayout) return Boolean(sharedLayoutId);
+      if (needsSharedBoard) return Boolean(sharedBoardId);
       if (mode === "single" && selectedScreenIds.length !== 1) return false;
-      return !needsPerScreenLayouts || selectedScreenIds.every((id) => Boolean(screenLayouts[id]));
+      return !needsPerScreenBoards || selectedScreenIds.every((id) => Boolean(screenBoards[id]));
     }
     return true;
   }
@@ -102,12 +99,14 @@ export function NewSessionPage() {
     try {
       const draft = await Sessions.createDraftSession(context.workspace.id, locationId, name.trim());
       setCreatedSessionId(draft.id);
-      await Sessions.setDisplayMode(context.workspace.id, draft.id, mode, needsSharedLayout ? sharedLayoutId : null);
-      if (boardId) await Sessions.setSessionBoard(context.workspace.id, draft.id, boardId);
+      const boardPlan = buildSessionBoardPlan(mode, selectedScreens.map((screen) => screen.id), sharedBoardId, screenBoards);
+      await Sessions.setSessionBoard(context.workspace.id, draft.id, boardPlan.sessionBoardId);
+      await Sessions.setDisplayMode(context.workspace.id, draft.id, mode, null);
       for (const [index, screen] of selectedScreens.entries()) {
         await Sessions.addScreenToSession(context.workspace.id, locationId, draft.id, {
           screen_id: screen.id,
-          layout_id: needsPerScreenLayouts ? screenLayouts[screen.id] : null,
+          board_id: boardPlan.boardsByScreen[screen.id] ?? null,
+          layout_id: null,
           is_primary: index === 0,
           screen_order: index,
         });
@@ -163,13 +162,17 @@ export function NewSessionPage() {
           <>
             <div><Monitor size={28} weight="duotone" /><h2 style={{ margin: "8px 0 4px" }}>Choose the displays</h2><p style={{ margin: 0, color: "var(--scena-text-secondary)" }}>Only paired, ready displays at this location are available.</p></div>
             {availableScreens === null ? <Skeleton height={80} /> : availableScreens.length === 0 ? <p style={{ color: "var(--scena-warning)" }}>No ready displays are available at this location yet. Pair a display first, then return here.</p> : (
-              <div style={{ display: "grid", gap: 10 }}>
+              <div className="scena-session-display-options">
                 {availableScreens.map((screen) => {
                   const selected = selectedScreenIds.includes(screen.id);
-                  return <label key={screen.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, border: `1px solid ${selected ? "var(--scena-accent)" : "var(--scena-border)"}`, borderRadius: "var(--scena-radius-md)", cursor: "pointer" }}>
-                    <input type="checkbox" checked={selected} onChange={() => toggleScreen(screen.id)} />
-                    <Monitor size={20} /><span style={{ flex: 1, fontWeight: 600 }}>{screen.name}</span><span style={{ color: "var(--scena-success)", fontSize: "var(--scena-text-xs)" }}>Ready</span>
-                  </label>;
+                  return (
+                    <DisplaySelectionOption
+                      key={screen.id}
+                      name={screen.name}
+                      selected={selected}
+                      onToggle={() => toggleScreen(screen.id)}
+                    />
+                  );
                 })}
               </div>
             )}
@@ -182,7 +185,35 @@ export function NewSessionPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
               {MODES.map((option) => <button key={option.value} type="button" onClick={() => setMode(option.value)} style={{ textAlign: "left", padding: 14, border: `1px solid ${mode === option.value ? "var(--scena-accent)" : "var(--scena-border)"}`, background: mode === option.value ? "var(--scena-surface-2)" : "transparent", borderRadius: "var(--scena-radius-md)", cursor: "pointer" }}><strong>{option.title}</strong><div style={{ marginTop: 6, fontSize: "var(--scena-text-xs)", color: "var(--scena-text-secondary)" }}>{option.description}</div></button>)}
             </div>
-            {layouts === null ? <Skeleton height={40} /> : needsSharedLayout ? <Field label="Shared layout" hint="This layout will be used by every selected display."><Select value={sharedLayoutId} onChange={(event) => setSharedLayoutId(event.target.value)} options={[{ value: "", label: "Select a layout" }, ...layouts.map((layout) => ({ value: layout.id, label: layout.name }))]} /></Field> : <div style={{ display: "grid", gap: 14 }}>{selectedScreens.map((screen) => <Field key={screen.id} label={`${screen.name} layout`}><Select value={screenLayouts[screen.id] ?? ""} onChange={(event) => setScreenLayouts((current) => ({ ...current, [screen.id]: event.target.value }))} options={[{ value: "", label: "Select a layout" }, ...layouts.map((layout) => ({ value: layout.id, label: layout.name }))]} /></Field>)}</div>}
+            {boards === null ? <Skeleton height={120} /> : activeBoards.length === 0 ? (
+              <EmptyState
+                icon={<Broadcast size={32} />}
+                title="Create a Board first"
+                description="Sessions play Boards. Build a Board with at least one Scene, then return here to route it to your Displays."
+                action={<Link to="/app/boards/new"><Button variant="secondary" size="sm">Create a Board</Button></Link>}
+              />
+            ) : needsSharedBoard ? (
+              <BoardChoiceGrid
+                label="Board for every Display"
+                hint={mode === "extend" ? "Scena will crop this Board across the arranged Display canvas." : "Every selected Display will play this Board in sync."}
+                boards={activeBoards}
+                value={sharedBoardId}
+                onChange={setSharedBoardId}
+              />
+            ) : (
+              <div className="scena-session-board-assignments">
+                {selectedScreens.map((screen) => (
+                  <BoardChoiceGrid
+                    key={screen.id}
+                    label={`${screen.name} Board`}
+                    hint="Choose the Board this Display should play."
+                    boards={activeBoards}
+                    value={screenBoards[screen.id] ?? ""}
+                    onChange={(value) => setScreenBoards((current) => ({ ...current, [screen.id]: value }))}
+                  />
+                ))}
+              </div>
+            )}
             {mode === "single" && selectedScreens.length !== 1 ? <p style={{ margin: 0, color: "var(--scena-warning)", fontSize: "var(--scena-text-sm)" }}>Single mode requires exactly one selected display.</p> : null}
           </>
         )}
@@ -191,9 +222,8 @@ export function NewSessionPage() {
           <>
             <div><h2 style={{ margin: 0 }}>Review and launch</h2><p style={{ margin: "6px 0 0", color: "var(--scena-text-secondary)" }}>This will create the draft, assign its displays and content, validate it, and start it.</p></div>
             <div style={{ display: "grid", gap: 10, fontSize: "var(--scena-text-sm)" }}>
-              <div><strong>Name</strong><br />{name}</div><div><strong>Location</strong><br />{locations.find((location) => location.id === locationId)?.name ?? "—"}</div><div><strong>Behavior</strong><br />{MODES.find((option) => option.value === mode)?.title} · {selectedScreens.length} display{selectedScreens.length === 1 ? "" : "s"}</div><div><strong>Content</strong><br />{boardId ? boards?.find((board) => board.id === boardId)?.name ?? "Selected Board" : "Layout playback"}</div>
+              <div><strong>Name</strong><br />{name}</div><div><strong>Location</strong><br />{locations.find((location) => location.id === locationId)?.name ?? "—"}</div><div><strong>Behavior</strong><br />{MODES.find((option) => option.value === mode)?.title} · {selectedScreens.length} Display{selectedScreens.length === 1 ? "" : "s"}</div><div><strong>Content</strong><br />{needsSharedBoard ? activeBoards.find((board) => board.id === sharedBoardId)?.name ?? "Selected Board" : selectedScreens.map((screen) => `${screen.name}: ${activeBoards.find((board) => board.id === screenBoards[screen.id])?.name ?? "Not assigned"}`).join(" · ")}</div>
             </div>
-            {boards === null ? <Skeleton height={40} /> : <Field label="Optional Board" hint="A Board can provide live scene content. Leave empty to use the selected Layout playback."><Select value={boardId} onChange={(event) => setBoardId(event.target.value)} options={[{ value: "", label: "Use Layout playback" }, ...boards.filter((board) => board.status === "active").map((board) => ({ value: board.id, label: board.name }))]} /></Field>}
           </>
         )}
 
