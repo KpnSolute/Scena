@@ -1,6 +1,34 @@
 # Changelog
 
-## Unreleased — truthful billing availability
+## 2026-09-07 — Backend capacity truth and connected data feeds
+
+Extended `workspace-context` so every authorized Workspace receives effective
+entitlements, including approved overrides, alongside current usage, remaining
+capacity, monthly upload-period usage, and an explicitly unmetered Connected
+Content count. The active-Session metric now matches the lifecycle states that
+actually reserve concurrent capacity.
+
+Extended Connected Content to subscribe to both KpnCompute day and cycle menu
+events, normalize both payloads, merge them into one versioned last-known-good
+snapshot, and bootstrap or manually refresh from the same public menu endpoints
+used by LunchVoice. Provider API bases are tenant-mapped server secrets; kiosks
+continue reading only Scena snapshots through `display-gateway`.
+
+Exposed the provider-neutral incoming-webhook path in Connections. Managers can
+now create a named source and event type, receive a unique HTTPS address plus a
+one-time bearer secret, and send arbitrary JSON snapshots without granting the
+provider database access. Existing generic sources continue to show their
+stable address, while KpnSolute remains a managed feed preset.
+
+This pass is source-only. The forward migration, Edge Functions, environment
+mapping, KpnLink subscription, and authenticated production acceptance remain
+separate approval and release gates.
+
+Split framework, Supabase, and icon dependencies into stable vendor chunks so
+the production build completes without the repository's prior large-chunk
+warning.
+
+## 2026-09-07 — Truthful billing availability and Studio Layers
 
 Added a first-class Studio Layers panel based on the authenticated Canva editor
 interaction review. Layers are listed front-to-back with canvas selection,

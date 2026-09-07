@@ -31,7 +31,8 @@ new API use Workspace terminology.
 
 | Endpoint | Status | Purpose |
 |---|---|---|
-| `workspace-context` | live-backend-verified | Profile, all authorized Workspaces, entitlements, selection |
+| `workspace-context` | deployed; capacity extension source-only | Profile, all authorized Workspaces, effective entitlements, current resource usage, selection |
+| `content-source` | deployed; generic-webhook and multi-event/bootstrap extensions source-only | Tenant-scoped incoming webhook addresses, signed CloudEvents ingestion, last-known-good snapshots, provider refresh |
 | `asset-upload` | end-to-end verified | Private source upload, queue finalization, list/detail/read/archive |
 | `board-interaction` | end-to-end verified | Board draft create/load/save/version/revision/archive |
 | `billing-checkout` | live-backend-verified | Personal one-time or Team subscription Checkout |
@@ -40,6 +41,13 @@ new API use Workspace terminology.
 
 The browser clients for the first three endpoints live under
 `src/services/scena-api`.
+
+Generic incoming webhooks receive a unique HTTPS address containing only the
+opaque source id. Scena reveals the associated bearer secret once at creation
+or rotation; the sending system posts an event id, configured event type,
+timestamp, and JSON `data` object. KpnSolute menu feeds use the same snapshot
+store but replace bearer ingestion with managed Standard Webhooks signatures
+and CloudEvents envelopes.
 
 ## Asset and media worker status
 

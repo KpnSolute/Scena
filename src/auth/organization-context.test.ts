@@ -43,6 +43,27 @@ const personalWorkspace = {
     allow_display_groups: false,
     allow_session_groups: false,
     allow_resource_access_controls: false,
+    allow_session_templates: false,
+    allow_operational_notifications: false,
+    max_display_groups: 0,
+    max_displays_per_display_group: 4,
+    max_session_groups: 0,
+    max_sessions_per_session_group: 3,
+    max_displays_per_session_group: 12,
+    health_retention_days: 7,
+    history_retention_days: 30,
+    has_override: false,
+  },
+  usage: {
+    quota_month: "2026-09-01",
+    resources: {
+      displays: { used: 0, limit: 2, remaining: 2, unlimited: false },
+      boards: { used: 0, limit: 5, remaining: 5, unlimited: false },
+      members: { used: 1, limit: 1, remaining: 0, unlimited: false },
+      concurrent_sessions: { used: 0, limit: 1, remaining: 1, unlimited: false },
+      asset_uploads_this_month: { used: 0, limit: 5, remaining: 5, unlimited: false },
+      content_sources: { used: 0, limit: null, remaining: null, unlimited: true },
+    },
   },
 };
 
