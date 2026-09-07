@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-07 — Generic webhook snapshot correction
+
+Kept KpnSolute day/cycle ingestion additive while restoring replace semantics
+for provider-neutral incoming webhooks. A complete generic snapshot can now
+remove stale top-level fields from the prior version instead of merging them
+indefinitely. This was caught during the production pre-deployment review; the
+multi-event migrations had not been applied live.
+
 ## 2026-09-07 — Backend capacity truth and connected data feeds
 
 Extended `workspace-context` so every authorized Workspace receives effective
