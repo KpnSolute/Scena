@@ -1,0 +1,81 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Scena Workspace Capacity and Connected Content API",
+    "version": "0.1.0",
+    "description": "Source contract for authoritative Workspace usage, provider-neutral incoming webhook addresses, and tenant-scoped live menu feeds. This contract is not a production deployment claim."
+  },
+  "x-verification": {
+    "status": "source-only",
+    "production_deployed": false,
+    "live_acceptance": false
+  },
+  "servers": [
+    {
+      "url": "https://zglbgqeccebqnijcqfkb.supabase.co/functions/v1"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Supabase JWT"
+      }
+    },
+    "schemas": {
+      "CapacityMetric": {
+        "type": "object",
+        "properties": {
+          "used": { "type": "integer", "minimum": 0 },
+          "limit": { "type": ["integer", "null"], "minimum": 0 },
+          "remaining": { "type": ["integer", "null"], "minimum": 0 },
+          "unlimited": { "type": "boolean" }
+        },
+        "required": ["used", "limit", "remaining", "unlimited"]
+      },
+      "WorkspaceUsage": {
+        "type": "object",
+        "properties": {
+          "quota_month": { "type": "string", "format": "date" },
+          "resources": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/components/schemas/CapacityMetric" }
+          }
+        },
+        "required": ["quota_month", "resources"]
+      },
+      "ContentSourceAction": {
+        "type": "string",
+        "enum": ["list", "get", "create", "create_kpnsolute", "refresh", "rotate", "archive"]
+      }
+    }
+  },
+  "paths": {
+    "/workspace-context": {
+      "post": {
+        "summary": "Load account, Workspace, effective tier, and current usage context",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Each Workspace includes effective entitlements and usage/remaining resource metrics." },
+          "401": { "description": "Sign-in required." },
+          "403": { "description": "Workspace membership required." }
+        }
+      }
+    },
+    "/content-source": {
+      "post": {
+        "summary": "Manage or ingest a connected content source",
+        "description": "Manager actions require a Supabase JWT. Generic providers receive a unique source URL and one-time bearer secret, then send event metadata plus an arbitrary JSON data object. Managed KpnSolute providers use a Standard Webhooks signature, CloudEvents 1.0 envelope, and tenant match. KpnCompute menu connections subscribe to day and cycle events and retain a merged last-known-good snapshot.",
+        "responses": {
+          "200": { "description": "Management action completed." },
+          "201": { "description": "Connection registered; bootstrap result is reported separately from registration." },
+          "202": { "description": "Provider event accepted idempotently." },
+          "401": { "description": "Manager or provider authentication failed." },
+          "403": { "description": "Workspace role or provider tenant mismatch." },
+          "422": { "description": "Event type, timestamp, envelope, or provider payload is invalid." }
+        }
+      }
+    }
+  }
+}
