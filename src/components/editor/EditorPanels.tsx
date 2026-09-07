@@ -6,11 +6,11 @@ import { Link } from "react-router-dom";
 import {
   TextT, ImageSquare, Shapes, FileText, QrCode, Clock, CalendarBlank, Timer,
   Megaphone, MusicNotes, VideoCamera, CloudSun, TextAa, Rows, Crown, Smiley,
-  MagnifyingGlass, FilmStrip,
+  MagnifyingGlass, FilmStrip, Eye, EyeSlash, Lock, LockOpen, ArrowUp, ArrowDown, Stack,
 } from "@phosphor-icons/react";
 import { SCENA_UI_API_CAPABILITIES } from "../../services/scena-api/capabilities";
 import type { AssetSummary } from "../../services/scena-api/assets";
-import type { ElementType, ShapeVariant } from "../../services/scena-api/boards";
+import type { BoardScene, ElementType, SceneElement, ShapeVariant } from "../../services/scena-api/boards";
 import { Skeleton } from "../ui/Skeleton";
 import { EmptyState } from "../ui/EmptyState";
 import { SHAPE_VARIANTS, SHAPE_VARIANT_ICONS, SHAPE_VARIANT_LABELS } from "./shapeVariants";
@@ -282,6 +282,62 @@ export function BrandPanel({ onApply }: { onApply: (brand: BrandPreset) => void 
     <span className="scena-editor__brand-swatches"><i style={{ background: brand.background }} /><i style={{ background: brand.surface }} /><i style={{ background: brand.accent }} /></span>
     <span><strong>{brand.name}</strong><small>{brand.font === "display" ? "Bricolage Grotesque" : "Instrument Sans"}</small></span>
   </button>)}</div>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Layers                                                             */
+/* ------------------------------------------------------------------ */
+
+const LAYER_LABELS: Record<ElementType, string> = {
+  text: "Text", image: "Image", shape: "Shape", asset_page: "Asset page",
+  qr_static: "QR code", qr_dynamic: "Connected QR", clock: "Clock", date: "Date",
+  countdown: "Countdown", ticker: "Ticker", music_player: "Music player",
+  carousel: "Asset rotation", video: "Video", weather: "Weather", data_text: "Connected text",
+};
+
+function layerName(element: SceneElement): string {
+  if (element.name?.trim()) return element.name.trim();
+  const text = typeof element.config?.text === "string" ? element.config.text.trim().split("\n")[0] : "";
+  if (text) return text.slice(0, 32);
+  const variant = typeof element.config?.variant === "string" ? element.config.variant : "";
+  return variant ? `${variant[0].toUpperCase()}${variant.slice(1)}` : LAYER_LABELS[element.element_type];
+}
+
+export interface LayersPanelProps {
+  scene: BoardScene;
+  selectedElementId: string | null;
+  onSelect: (elementId: string) => void;
+  onChange: (elementId: string, patch: Partial<SceneElement>) => void;
+  onMove: (elementId: string, direction: "up" | "down") => void;
+}
+
+export function LayersPanel({ scene, selectedElementId, onSelect, onChange, onMove }: LayersPanelProps) {
+  const layers = [...scene.elements].sort((a, b) => b.z_index - a.z_index);
+  if (layers.length === 0) {
+    return <div className="scena-editor__layers-empty"><Stack size={28} /><strong>This Scene is empty</strong><span>Add content from Elements, Text, or Uploads.</span></div>;
+  }
+  return (
+    <div className="scena-editor__layers" role="list" aria-label="Scene layers">
+      <p className="scena-editor__layers-help">Top items appear in front. Select a layer to edit it on the canvas.</p>
+      {layers.map((element, index) => {
+        const selected = selectedElementId === element.id;
+        return (
+          <div key={element.id} className={`scena-editor__layer${selected ? " scena-editor__layer--selected" : ""}`} role="listitem">
+            <button type="button" className="scena-editor__layer-main" aria-pressed={selected} onClick={() => onSelect(element.id)}>
+              <span className="scena-editor__layer-icon">{ELEMENT_ICONS[element.element_type]}</span>
+              <span><strong>{layerName(element)}</strong><small>{LAYER_LABELS[element.element_type]}</small></span>
+            </button>
+            <div className="scena-editor__layer-actions">
+              <button type="button" title={element.is_visible ? "Hide layer" : "Show layer"} aria-label={`${element.is_visible ? "Hide" : "Show"} ${layerName(element)}`} onClick={() => onChange(element.id, { is_visible: !element.is_visible })}>{element.is_visible ? <Eye size={15} /> : <EyeSlash size={15} />}</button>
+              <button type="button" title={element.is_locked ? "Unlock layer" : "Lock layer"} aria-label={`${element.is_locked ? "Unlock" : "Lock"} ${layerName(element)}`} onClick={() => onChange(element.id, { is_locked: !element.is_locked })}>{element.is_locked ? <Lock size={15} /> : <LockOpen size={15} />}</button>
+              <button type="button" title="Move layer forward" aria-label={`Move ${layerName(element)} forward`} disabled={index === 0} onClick={() => onMove(element.id, "up")}><ArrowUp size={15} /></button>
+              <button type="button" title="Move layer backward" aria-label={`Move ${layerName(element)} backward`} disabled={index === layers.length - 1} onClick={() => onMove(element.id, "down")}><ArrowDown size={15} /></button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */

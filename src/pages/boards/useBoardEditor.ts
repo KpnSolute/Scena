@@ -187,6 +187,29 @@ export function useBoardEditor(boardId: string, workspaceId: string) {
     });
   }
 
+  function moveElement(sceneId: string, elementId: string, direction: "up" | "down") {
+    mutate((draft) => ({
+      ...draft,
+      scenes: draft.scenes.map((scene) => {
+        if (scene.id !== sceneId) return scene;
+        const ordered = [...scene.elements].sort((a, b) => a.z_index - b.z_index);
+        const index = ordered.findIndex((element) => element.id === elementId);
+        const swapWith = direction === "up" ? index + 1 : index - 1;
+        if (index < 0 || swapWith < 0 || swapWith >= ordered.length) return scene;
+        const current = ordered[index];
+        const neighbor = ordered[swapWith];
+        return {
+          ...scene,
+          elements: scene.elements.map((element) => {
+            if (element.id === current.id) return { ...element, z_index: neighbor.z_index };
+            if (element.id === neighbor.id) return { ...element, z_index: current.z_index };
+            return element;
+          }),
+        };
+      }),
+    }));
+  }
+
   function addScene(scene: BoardScene) {
     mutate((draft) => ({ ...draft, scenes: [...draft.scenes, scene] }));
     setSelectedSceneId(scene.id);
@@ -274,6 +297,7 @@ export function useBoardEditor(boardId: string, workspaceId: string) {
     addElement,
     removeElement,
     duplicateElement,
+    moveElement,
     addScene,
     duplicateScene,
     removeScene,

@@ -6,7 +6,7 @@
 // have a billing customer, and a genuinely separate "create a paid
 // Workspace" flow — not a misleading in-place "Upgrade" button.
 import { useState } from "react";
-import { CreditCard, Check } from "@phosphor-icons/react";
+import { CreditCard, Check, LockKey } from "@phosphor-icons/react";
 import { useManagerContext } from "../../app/ManagerContextProvider";
 import * as Billing from "../../domain/billing";
 import { callEdgeFunction } from "../../services/supabase/client";
@@ -18,13 +18,6 @@ import { Field } from "../../components/ui/Field";
 import { Input } from "../../components/ui/Input";
 import { ErrorBanner } from "../../components/ui/ErrorBanner";
 
-const OFFERING_LABELS: Record<Billing.CheckoutOfferingCode, string> = {
-  personal_additional: "Additional Personal Workspace — $15 one-time",
-  plus: "Plus Team Workspace — $15/month",
-  pro: "Pro Team Workspace — $25/month",
-  max: "Max Team Workspace — $40/month",
-};
-
 export function BillingPage() {
   const context = useManagerContext();
   const entitlements = context.workspace.entitlements;
@@ -34,6 +27,7 @@ export function BillingPage() {
   const [workspaceName, setWorkspaceName] = useState("");
   const [checkoutError, setCheckoutError] = useState<unknown>(null);
   const [submitting, setSubmitting] = useState(false);
+  const canManageBilling = Billing.canManageWorkspaceBilling(context.workspace.type, entitlements?.plan_code);
 
   async function openPortal() {
     setPortalLoading(true);
@@ -80,21 +74,46 @@ export function BillingPage() {
           </ul>
         )}
         {portalError ? <div style={{ marginTop: 16 }}><ErrorBanner error={portalError} /></div> : null}
-        <div style={{ marginTop: 16 }}>
-          <Button variant="secondary" icon={<CreditCard size={18} />} loading={portalLoading} onClick={openPortal}>
-            Manage billing
-          </Button>
-        </div>
+        {canManageBilling ? (
+          <div style={{ marginTop: 16 }}>
+            <Button variant="secondary" icon={<CreditCard size={18} />} loading={portalLoading} onClick={openPortal}>
+              Manage billing
+            </Button>
+          </div>
+        ) : (
+          <p style={{ marginTop: 16, marginBottom: 0, color: "var(--scena-text-secondary)", fontSize: "var(--scena-text-sm)" }}>
+            Personal Free has no subscription to manage. You can create a separate paid Workspace below.
+          </p>
+        )}
       </Card>
 
       <PageHeader title="Add a paid Workspace" description="Each Workspace is billed separately — this creates a new one, it doesn't change your current Workspace's plan." />
       <div className="scena-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-        {(Object.keys(OFFERING_LABELS) as Billing.CheckoutOfferingCode[]).map((code) => (
-          <Card key={code}>
-            <div style={{ fontSize: "var(--scena-text-sm)", marginBottom: 16 }}>{OFFERING_LABELS[code]}</div>
-            <Button variant="primary" size="sm" block onClick={() => setCheckoutOffering(code)}>Get started</Button>
-          </Card>
-        ))}
+        {Billing.CHECKOUT_OFFERINGS.map((offering) => {
+          const checkoutAvailable = Billing.isOfferingCheckoutAvailable(offering.availability);
+          return (
+            <Card key={offering.code}>
+              <div style={{ fontSize: "var(--scena-text-sm)", marginBottom: 8 }}>
+                {offering.name} Workspace — {offering.price}{offering.cadence === "/month" ? "/month" : ` ${offering.cadence}`}
+              </div>
+              {offering.availabilityNote ? (
+                <p style={{ minHeight: 40, color: "var(--scena-text-secondary)", fontSize: "var(--scena-text-xs)", margin: "0 0 16px" }}>
+                  {offering.availabilityNote}
+                </p>
+              ) : <div style={{ height: 56 }} />}
+              <Button
+                variant={checkoutAvailable ? "primary" : "secondary"}
+                size="sm"
+                block
+                disabled={!checkoutAvailable}
+                icon={!checkoutAvailable ? <LockKey size={16} /> : undefined}
+                onClick={checkoutAvailable ? () => setCheckoutOffering(offering.code) : undefined}
+              >
+                {checkoutAvailable ? "Get started" : "Coming later"}
+              </Button>
+            </Card>
+          );
+        })}
       </div>
 
       <Modal
@@ -111,6 +130,14 @@ export function BillingPage() {
         }
       >
         {checkoutError ? <div style={{ marginBottom: 16 }}><ErrorBanner error={checkoutError} /></div> : null}
+        {checkoutOffering ? (() => {
+          const offering = Billing.CHECKOUT_OFFERINGS.find((item) => item.code === checkoutOffering);
+          return offering?.availabilityNote ? (
+            <p style={{ marginTop: 0, color: "var(--scena-text-secondary)", fontSize: "var(--scena-text-sm)" }}>
+              {offering.availabilityNote}
+            </p>
+          ) : null;
+        })() : null}
         <Field label="Workspace name">
           <Input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Acme Diner" />
         </Field>

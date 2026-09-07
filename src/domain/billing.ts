@@ -4,6 +4,39 @@ import { mapPostgresError } from "../shared/errors";
 export type WorkspaceType = "personal" | "team";
 export type BillingMode = "free" | "one_time" | "subscription";
 export type CheckoutOfferingCode = "personal_additional" | "plus" | "pro" | "max";
+export type OfferingCode = "personal_free" | CheckoutOfferingCode;
+export type OfferingAvailability = "generally_available" | "limited" | "pilot" | "waitlist" | "unavailable";
+
+export interface OfferingPresentation {
+  code: OfferingCode;
+  name: string;
+  price: string;
+  cadence: string;
+  availability: OfferingAvailability;
+  availabilityNote?: string;
+  features: string[];
+  featured?: boolean;
+}
+
+export const PUBLIC_OFFERINGS: readonly OfferingPresentation[] = [
+  { code: "personal_free", name: "Personal Free", price: "$0", cadence: "forever", availability: "generally_available", features: ["1 Personal Workspace", "2 Displays", "5 Boards", "5 source uploads / month", "1 member"] },
+  { code: "personal_additional", name: "Additional Personal", price: "$15", cadence: "one-time", availability: "generally_available", features: ["One more Personal Workspace", "Same Personal Free limits", "No recurring charge"] },
+  { code: "plus", name: "Plus", price: "$15", cadence: "/month", availability: "limited", availabilityNote: "Limited availability — onboarding is reviewed before your Workspace is provisioned.", features: ["Team Workspace", "2 Displays", "10 Boards", "5 members", "1 concurrent Session"], featured: true },
+  { code: "pro", name: "Pro", price: "$25", cadence: "/month", availability: "limited", availabilityNote: "Limited availability — onboarding is reviewed before your Workspace is provisioned.", features: ["Team Workspace", "5 Displays", "30 Boards", "10 members", "Basic automation"] },
+  { code: "max", name: "Max", price: "$40", cadence: "/month", availability: "unavailable", availabilityNote: "Not yet available. Groups and advanced automation are still in development.", features: ["Team Workspace", "15 Displays", "50 Boards", "25 members", "Advanced automation, groups"] },
+] as const;
+
+export const CHECKOUT_OFFERINGS = PUBLIC_OFFERINGS.filter(
+  (offering): offering is OfferingPresentation & { code: CheckoutOfferingCode } => offering.code !== "personal_free",
+);
+
+export function isOfferingCheckoutAvailable(availability: OfferingAvailability): boolean {
+  return availability === "generally_available" || availability === "limited";
+}
+
+export function canManageWorkspaceBilling(workspaceType: WorkspaceType, planCode?: string | null): boolean {
+  return workspaceType === "team" && ["plus", "pro", "max"].includes(planCode ?? "");
+}
 
 export interface Plan {
   plan_code: string;

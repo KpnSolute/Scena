@@ -103,3 +103,29 @@ describe("Workspace Checkout", () => {
     expect(mockCallEdgeFunction).not.toHaveBeenCalled();
   });
 });
+
+describe("offering presentation", () => {
+  it("allows generally available and limited checkout states", async () => {
+    const { isOfferingCheckoutAvailable } = await import("./billing");
+
+    expect(isOfferingCheckoutAvailable("generally_available")).toBe(true);
+    expect(isOfferingCheckoutAvailable("limited")).toBe(true);
+  });
+
+  it("blocks pilot, waitlist, and unavailable checkout states", async () => {
+    const { isOfferingCheckoutAvailable } = await import("./billing");
+
+    expect(isOfferingCheckoutAvailable("pilot")).toBe(false);
+    expect(isOfferingCheckoutAvailable("waitlist")).toBe(false);
+    expect(isOfferingCheckoutAvailable("unavailable")).toBe(false);
+  });
+
+  it("only offers billing management for paid Team Workspaces", async () => {
+    const { canManageWorkspaceBilling } = await import("./billing");
+
+    expect(canManageWorkspaceBilling("personal", "personal_free")).toBe(false);
+    expect(canManageWorkspaceBilling("team", "plus")).toBe(true);
+    expect(canManageWorkspaceBilling("team", "pro")).toBe(true);
+    expect(canManageWorkspaceBilling("team", null)).toBe(false);
+  });
+});

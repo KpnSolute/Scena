@@ -13,6 +13,7 @@ import { ScenaMark } from "../../components/brand/ScenaMark";
 import { Accordion } from "../../components/ui/Accordion";
 import { HeroEditorDemo } from "./HeroEditorDemo";
 import { supabase } from "../../services/supabase/client";
+import { PUBLIC_OFFERINGS, isOfferingCheckoutAvailable } from "../../domain/billing";
 
 const NAV_LINKS = [
   { label: "Product", href: "#product" },
@@ -42,26 +43,6 @@ const STEPS = [
   { title: "Build a Board", desc: "Arrange Scenes and Elements on a real canvas, sized to your Display." },
   { title: "Pair a Display", desc: "Enter the six-digit pairing code shown on the screen to connect it to your Workspace." },
 ];
-
-// `availability` mirrors public.plan_entitlements.availability, which SOP §6
-// treats as data rather than convention. A plan that is not
-// `generally_available` must not be presented as an ordinary purchase: SOP §3.1
-// forbids selling an unavailable capability without a written limitation.
-const PRICING = [
-  { code: "personal_free", name: "Personal Free", price: "$0", cadence: "forever", availability: "generally_available", features: ["1 Personal Workspace", "2 Displays", "5 Boards", "5 source uploads / month", "1 member"] },
-  { code: "personal_additional", name: "Additional Personal", price: "$15", cadence: "one-time", availability: "generally_available", features: ["One more Personal Workspace", "Same Personal Free limits", "No recurring charge"] },
-  { code: "plus", name: "Plus", price: "$15", cadence: "/month", availability: "limited", features: ["Team Workspace", "2 Displays", "10 Boards", "5 members", "1 concurrent Session"], featured: true },
-  { code: "pro", name: "Pro", price: "$25", cadence: "/month", availability: "limited", features: ["Team Workspace", "5 Displays", "30 Boards", "10 members", "Basic automation"] },
-  // Max stays unavailable until Display Groups, Session Groups, resource access
-  // control and templates are reachable from the manager UI. Working schema is
-  // not a shipped product (SOP §6).
-  { code: "max", name: "Max", price: "$40", cadence: "/month", availability: "unavailable", features: ["Team Workspace", "15 Displays", "50 Boards", "25 members", "Advanced automation, groups"] },
-];
-
-const AVAILABILITY_NOTE: Record<string, string> = {
-  limited: "Limited availability — onboarding is reviewed before your Workspace is provisioned.",
-  unavailable: "Not yet available. Groups and advanced automation are still in development.",
-};
 
 const FAQ = [
   { key: "what", question: "What is Scena?", answer: "Scena is a digital signage platform for building Boards and playing them on paired Displays, backed by real Workspace, Asset, and Board APIs." },
@@ -173,7 +154,7 @@ export function LandingPage() {
         <div className="scena-section__eyebrow">Pricing</div>
         <h2 className="scena-section__title">Start free. Upgrade your Workspace when you need to.</h2>
         <div className="scena-pricing-grid">
-          {PRICING.map((plan) => (
+          {PUBLIC_OFFERINGS.map((plan) => (
             <div className={`scena-price-card${plan.featured ? " scena-price-card--featured" : ""}`} key={plan.code}>
               <h3>{plan.name}</h3>
               <div className="scena-price-card__price">
@@ -187,10 +168,10 @@ export function LandingPage() {
                   </li>
                 ))}
               </ul>
-              {AVAILABILITY_NOTE[plan.availability] ? (
-                <p className="scena-price-card__availability">{AVAILABILITY_NOTE[plan.availability]}</p>
+              {plan.availabilityNote ? (
+                <p className="scena-price-card__availability">{plan.availabilityNote}</p>
               ) : null}
-              {plan.availability === "unavailable" ? (
+              {!isOfferingCheckoutAvailable(plan.availability) ? (
                 <Button variant="secondary" block disabled>
                   Coming later
                 </Button>
@@ -265,7 +246,7 @@ export function LandingPage() {
         </div>
         <div className="scena-footer__bottom">
           <span>© {new Date().getFullYear()} Scena, a KpnSolute product.</span>
-          <span>All systems operational</span>
+          <Link to="/docs">Service documentation</Link>
         </div>
       </footer>
     </div>

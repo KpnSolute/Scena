@@ -7,6 +7,16 @@ Before material work, read the canonical cross-project ledger:
 
 `C:\Projects\_config\kpnsolute-governance\SHARED_MEMORY.md`
 
+Before proposing or implementing a material product-definition change, read
+`C:\Projects\loom\governance\PRODUCT_CHARTERS.md` and
+`C:\Projects\loom\governance\PRODUCT_CHANGE_CONTROL.md`, then obtain a recorded
+Loom verdict. Material changes include product mission, identity, users,
+promises, non-goals, major features, pricing or entitlement claims, tenancy,
+shared architecture, APIs or events, and portfolio placement. Routine fixes and
+implementation inside approved scope may proceed only after citing the governing
+charter or decision. Loom approval does not authorize a commit, push, release,
+deployment, purchase, credential use, or legal commitment.
+
 After material work, append a dated contribution using the governance append
 helper. Keep local `AGENTS.md`, `CLAUDE.md`, and `CHANGELOG.md` rules in force;
 shared memory records cross-project operational state and never stores secrets.

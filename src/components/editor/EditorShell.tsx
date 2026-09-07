@@ -9,7 +9,7 @@ import {
   House, ArrowCounterClockwise, ArrowClockwise, ClockCounterClockwise,
   CheckCircle, CircleNotch, WarningCircle,
   SquaresFour, TextT, UploadSimple, Layout, PaintBrushBroad, Crown, CaretDoubleLeft,
-  MagnifyingGlassMinus, MagnifyingGlassPlus, FilmStrip, CornersOut, CornersIn,
+  MagnifyingGlassMinus, MagnifyingGlassPlus, FilmStrip, CornersOut, CornersIn, Stack,
 } from "@phosphor-icons/react";
 import { IconButton, Button } from "../ui/Button";
 import type { SaveState } from "../../pages/boards/useBoardEditor";
@@ -101,12 +101,13 @@ export function EditorTopBar({
 /* Left icon rail + slide-out panel drawer                            */
 /* ------------------------------------------------------------------ */
 
-export type EditorRailItemKey = "elements" | "text" | "uploads" | "templates" | "brand";
+export type EditorRailItemKey = "elements" | "text" | "uploads" | "layers" | "templates" | "brand";
 
 const RAIL_ITEMS: { key: EditorRailItemKey; label: string; icon: ReactNode; premium?: boolean }[] = [
   { key: "elements", label: "Elements", icon: <SquaresFour size={22} /> },
   { key: "text", label: "Text", icon: <TextT size={22} /> },
   { key: "uploads", label: "Uploads", icon: <UploadSimple size={22} /> },
+  { key: "layers", label: "Layers", icon: <Stack size={22} /> },
   { key: "templates", label: "Templates", icon: <Layout size={22} /> },
   { key: "brand", label: "Brand", icon: <PaintBrushBroad size={22} /> },
 ];
@@ -115,6 +116,7 @@ const RAIL_LABELS: Record<EditorRailItemKey, string> = {
   elements: "Elements",
   text: "Text",
   uploads: "Uploads",
+  layers: "Layers",
   templates: "Templates",
   brand: "Brand",
 };

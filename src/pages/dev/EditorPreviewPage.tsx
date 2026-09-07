@@ -10,7 +10,7 @@ import {
 } from "../../components/editor/EditorShell";
 import type { EditorRailItemKey } from "../../components/editor/EditorShell";
 import {
-  ElementsGridPanel, TextPresetsPanel, UploadsPanel, TemplatesPanel, BrandPanel,
+  ElementsGridPanel, TextPresetsPanel, UploadsPanel, LayersPanel, TemplatesPanel, BrandPanel,
 } from "../../components/editor/EditorPanels";
 import type { TextPresetSpec } from "../../components/editor/EditorPanels";
 import { applyBrandPreset, createSceneFromTemplate } from "../../components/editor/studioPresets";
@@ -292,6 +292,7 @@ export function EditorPreviewPage() {
     : activePanel === "text" ? <TextPresetsPanel onInsertPreset={addTextPreset} />
     // Preview never fetches: Uploads shows its empty state.
     : activePanel === "uploads" ? <UploadsPanel assets={[]} onInsertAsset={() => {}} />
+    : activePanel === "layers" ? <LayersPanel scene={scene} selectedElementId={selectedElementId} onSelect={setSelectedElementId} onChange={(elementId, patch) => mutate((draft) => draft.map((item) => item.id === scene.id ? { ...item, elements: item.elements.map((element) => element.id === elementId ? { ...element, ...patch } : element) } : item))} onMove={(elementId, direction) => mutate((draft) => draft.map((item) => item.id === scene.id ? { ...item, elements: item.elements.map((element) => element.id === elementId ? { ...element, z_index: element.z_index + (direction === "up" ? 1 : -1) } : element) } : item))} />
     : activePanel === "templates" ? <TemplatesPanel onApply={(templateId) => { const next = createSceneFromTemplate(templateId, scenes.length); mutate((draft) => [...draft, next]); setSelectedSceneId(next.id); }} />
     : activePanel === "brand" ? <BrandPanel onApply={(brand) => mutate((draft) => draft.map((item) => item.id === scene.id ? { ...item, ...applyBrandPreset(item, brand) } : item))} />
     : null;

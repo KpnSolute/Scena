@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — truthful billing availability
+
+Added a first-class Studio Layers panel based on the authenticated Canva editor
+interaction review. Layers are listed front-to-back with canvas selection,
+visibility, locking, and adjacent forward/back ordering controls. Layer moves
+now swap actual neighbors instead of creating duplicate stacking values. The
+local Studio preview, TypeScript, production build, and all 213 tests pass;
+deployment and authenticated production acceptance remain separate gates.
+
+Unified the public and authenticated billing offering metadata so generally
+available, limited, and unavailable plans render consistently. Max no longer
+has an actionable Checkout path, Plus and Pro disclose reviewed onboarding
+before Checkout, and Personal Free no longer offers a Stripe portal action it
+cannot satisfy. Removed the unverified global operational-status claim.
+
+Added fail-closed entitlement availability enforcement to `billing-checkout`
+before any Checkout or customer side effect. The function maps an additional
+Personal Workspace to the Personal Free entitlement, permits only generally
+available and limited offerings, and rejects unavailable or malformed states.
+Added focused browser-domain and Deno helper coverage. Deployment and live
+acceptance remain separate production gates.
+
 ## 2026-08-05 — Board-first Session routing and dropdown refinement
 
 Replaced the new-Session wizard's empty legacy Layout selectors with visual

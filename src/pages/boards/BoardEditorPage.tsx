@@ -12,7 +12,7 @@ import {
 } from "../../components/editor/EditorShell";
 import type { EditorRailItemKey } from "../../components/editor/EditorShell";
 import {
-  ElementsGridPanel, TextPresetsPanel, UploadsPanel, TemplatesPanel, BrandPanel,
+  ElementsGridPanel, TextPresetsPanel, UploadsPanel, LayersPanel, TemplatesPanel, BrandPanel,
 } from "../../components/editor/EditorPanels";
 import type { TextPresetSpec } from "../../components/editor/EditorPanels";
 import { applyBrandPreset, createSceneFromTemplate } from "../../components/editor/studioPresets";
@@ -312,6 +312,7 @@ export function BoardEditorPage() {
     activePanel === "elements" ? <ElementsGridPanel onAddElement={(type) => handleAddElement(type)} onAddShape={handleAddShape} onAddLibraryAsset={(type, config) => handleAddElement(type, undefined, config)} />
     : activePanel === "text" ? <TextPresetsPanel onInsertPreset={handleAddTextPreset} />
     : activePanel === "uploads" ? <UploadsPanel assets={assets} previewUrls={assetPreviewUrls} onInsertAsset={handleInsertAsset} />
+    : activePanel === "layers" && scene ? <LayersPanel scene={scene} selectedElementId={editor.selectedElementId} onSelect={editor.setSelectedElementId} onChange={(elementId, patch) => editor.updateElement(scene.id, elementId, patch)} onMove={(elementId, direction) => editor.moveElement(scene.id, elementId, direction)} />
     : activePanel === "templates" ? <TemplatesPanel onApply={(templateId) => editor.addScene(createSceneFromTemplate(templateId, snapshot.scenes.length))} />
     : activePanel === "brand" ? <BrandPanel onApply={(brand) => scene && editor.updateScene(scene.id, applyBrandPreset(scene, brand))} />
     : null;
@@ -367,8 +368,7 @@ export function BoardEditorPage() {
           onDuplicate={() => scene && editor.selectedElementId && editor.duplicateElement(scene.id, editor.selectedElementId)}
           onLayerMove={(direction) => {
             if (!scene || !editor.selectedElement) return;
-            const delta = direction === "up" ? 1 : -1;
-            editor.updateElement(scene.id, editor.selectedElement.id, { z_index: editor.selectedElement.z_index + delta });
+            editor.moveElement(scene.id, editor.selectedElement.id, direction);
           }}
         />
       </div>

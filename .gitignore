@@ -17,3 +17,8 @@ dist/
 # for this project's Supabase MCP connection.
 .cursor/
 .vscode/
+
+# Agent-local settings, package cache, and isolated Git worktrees.
+.claude/settings.local.json
+.pnpm-store/
+.worktrees/

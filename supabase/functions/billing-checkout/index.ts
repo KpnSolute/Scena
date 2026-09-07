@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { decideAvailability, entitlementPlanCode, type CheckoutOfferingCode } from "./availability.ts";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -98,6 +99,19 @@ Deno.serve(async (req: Request) => {
       : offering.workspace_type === "team" && offering.billing_mode === "subscription";
     if (!expectedShape) {
       return json({ error: { code: "OFFERING_CONFIGURATION_INVALID", message: "This offering is configured incorrectly.", request_id: requestId } }, 503);
+    }
+
+    const entitlementResult = await admin
+      .from("plan_entitlements")
+      .select("availability,availability_note")
+      .eq("plan_code", entitlementPlanCode(offeringCode as CheckoutOfferingCode))
+      .maybeSingle();
+    if (entitlementResult.error) {
+      return json({ error: { code: "OFFERING_CONFIGURATION_INVALID", message: "This offering's availability could not be verified.", request_id: requestId } }, 503);
+    }
+    const availability = decideAvailability(entitlementResult.data);
+    if (!availability.ok) {
+      return json({ error: { code: availability.code, message: availability.message, request_id: requestId } }, availability.status);
     }
 
     const workspaceSlug = suppliedSlug || generatedSlug(workspaceName);
